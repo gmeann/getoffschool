@@ -3,6 +3,8 @@ import { ExitIcon, PersonIcon, SettingsIcon, SoundOffIcon } from './Icons'
 import { TODAY_VISITORS } from '../data/world'
 import { SCENES, SCENE_ORDER, type ActionId, type SceneId } from '../data/scenes'
 import type { PlayerUi } from '../hooks/playerStore'
+import { METHODS, type MethodChoice } from '../data/tasks'
+import type { CounterSnapshot } from '../services/counterService'
 
 export type HudAction = 'exit' | 'sound' | 'settings' | ActionId
 
@@ -16,10 +18,14 @@ type Props = {
   titles: string[]
   /** 대화창이 열려 있으면 하단 버튼은 숨김 */
   hideBottom: boolean
+  /** 교실: 날린 업무 카운터, 남은 서류, 고른 방식 */
+  counter: CounterSnapshot
+  remaining: number
+  method: MethodChoice
 }
 
 /** HTML 오버레이 UI (알약형 반투명 버튼) */
-export function Hud({ sceneId, onAction, onScene, toast, player, laps, titles, hideBottom }: Props) {
+export function Hud({ sceneId, onAction, onScene, toast, player, laps, titles, hideBottom, counter, remaining, method }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const running = player.mode === 'run'
   const sitting = player.mode === 'sit' || player.mode === 'toBench'
@@ -30,12 +36,16 @@ export function Hud({ sceneId, onAction, onScene, toast, player, laps, titles, h
     sky: { active: player.skyLook, emoji: player.skyLook ? '👀' : '🌇', label: player.skyLook ? '그만 보기' : '하늘 보기' },
     book: { active: false, emoji: '📖', label: '도감' },
     greet: { active: false, emoji: '🙏', label: '인사하기' },
+    fling: { active: false, emoji: '📄', label: '날리기' },
+    method: { active: false, emoji: METHODS.find((m) => m.id === method)?.emoji ?? '✈️', label: '방식 선택' },
   }
+  const flingDone = remaining <= 0
   const actions = SCENES[sceneId].actions
 
   return (
     <div className="hud">
       <div className="hud-top">
+        <div className="hud-left">
         <div className="hud-group left">
           <button className="pill icon" aria-label="나가기" onClick={() => onAction('exit')}>
             <ExitIcon />
@@ -81,6 +91,18 @@ export function Hud({ sceneId, onAction, onScene, toast, player, laps, titles, h
             )}
           </div>
         </div>
+          {sceneId === 'classroom' && (
+            <div className="pill counter" aria-label={`오늘 날린 업무 ${counter.today}장, 누적 ${counter.total}장`}>
+              <span>
+                📮 오늘 날린 업무 <strong>{counter.today}</strong>장
+              </span>
+              <span className="sep">·</span>
+              <span>
+                누적 <strong>{counter.total}</strong>장
+              </span>
+            </div>
+          )}
+        </div>
 
         <div className="hud-right">
           <div className="hud-right-main">
@@ -117,7 +139,7 @@ export function Hud({ sceneId, onAction, onScene, toast, player, laps, titles, h
             return (
               <button
                 key={id}
-                className={`pill action ${a.active ? 'active' : ''}`}
+                className={`pill action ${a.active ? 'active' : ''} ${id === 'fling' && flingDone ? 'dim' : ''}`}
                 aria-pressed={a.active}
                 onClick={() => onAction(id)}
               >

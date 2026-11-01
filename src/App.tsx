@@ -2,6 +2,13 @@ import { Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStor
 import { Canvas } from '@react-three/fiber'
 import { Playground } from './scenes/Playground'
 import { Office } from './scenes/Office'
+import { Classroom } from './scenes/Classroom'
+import { MethodPicker } from './components/MethodPicker'
+import { pileTop } from './components/PaperPile'
+import type { TaskEffectsHandle } from './components/TaskEffects'
+import { TITLE_DONE } from './data/tasks'
+import { flingOne, getTaskUi, setMethod, subscribeTasks } from './hooks/taskStore'
+import { counterService } from './services/counterService'
 import { Hud, type HudAction } from './components/Hud'
 import { DialogSheet } from './components/DialogSheet'
 import { SnackBook } from './components/SnackBook'
@@ -43,6 +50,8 @@ export default function App() {
   const [toast, setToast] = useState<string | null>(null)
   const [dialog, setDialog] = useState<Dialog | null>(null)
   const [bookOpen, setBookOpen] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const effectsRef = useRef<TaskEffectsHandle | null>(null)
   const [floatSnack, setFloatSnack] = useState<{ snack: Snack; key: number } | null>(null)
   const [npcBubbles, setNpcBubbles] = useState<Partial<Record<NpcId, string>>>({})
   const [npcBows, setNpcBows] = useState<Partial<Record<NpcId, number>>>({})
@@ -56,6 +65,8 @@ export default function App() {
   const playerUi = useSyncExternalStore(subscribePlayer, getPlayerUi)
   const lapUi = useSyncExternalStore(subscribeLaps, getLapUi)
   const snackUi = useSyncExternalStore(subscribeSnacks, getSnackUi)
+  const taskUi = useSyncExternalStore(subscribeTasks, getTaskUi)
+  const counter = useSyncExternalStore(counterService.subscribe, counterService.getSnapshot)
 
   const showBubble = useCallback((text: string, ms = 1800) => {
     setBubble(text)
@@ -80,7 +91,8 @@ export default function App() {
     () =>
       onLapEvent((e) => {
         if (e.type === 'lap') showBubble('한 바퀴 완주!', 2200)
-        else showToast(`🏅 칭호 획득! '${e.title}'`, 3500)
+        // 업무 완료 칭호는 완료 문구와 함께 따로 보여 줌
+        else if (e.title !== TITLE_DONE) showToast(`🏅 칭호 획득! '${e.title}'`, 3500)
       }),
     [showBubble, showToast],
   )
@@ -93,6 +105,7 @@ export default function App() {
       transitioning.current = true
       setDialog(null)
       setBookOpen(false)
+      setPickerOpen(false)
       setFading(true)
       window.setTimeout(() => {
         // 화면이 완전히 어두워진 뒤 장면 교체 (이전 장면은 언마운트되며 자원 정리)
@@ -185,6 +198,21 @@ export default function App() {
     }, 350)
   }, [showBubble, showNpcBubble])
 
+  // ---------- 업무 날리기 ----------
+  const fling = useCallback(() => {
+    const before = getTaskUi().remaining
+    const r = flingOne()
+    if (!r) {
+      showToast('오늘 서류는 다 날렸어요. 내일 또 쌓일 거예요 🌙', 2200)
+      return
+    }
+    effectsRef.current?.play(r.method, r.label, pileTop(before))
+    showBubble(r.line, 1600)
+    if (r.done) {
+      window.setTimeout(() => showToast(`🎉 오늘 업무 끝! 퇴근 준비 완료 · 🏅 칭호 '${TITLE_DONE}'`, 4200), 900)
+    }
+  }, [showBubble, showToast])
+
   const handleAction = useCallback(
     (action: HudAction) => {
       switch (action) {
@@ -198,13 +226,17 @@ export default function App() {
           return setBookOpen(true)
         case 'greet':
           return greet()
+        case 'fling':
+          return fling()
+        case 'method':
+          return setPickerOpen(true)
         case 'sound':
           return showToast(`소리는 ${SOON}`)
         default:
           return showToast(SOON)
       }
     },
-    [showToast, greet],
+    [showToast, greet, fling],
   )
 
   const sceneProps = { name, bubble, labelLayer, onDoor: handleDoor }
@@ -226,6 +258,16 @@ export default function App() {
         <Suspense fallback={null}>
           {/* 한 번에 한 장면만 불러옴. key 가 바뀌면 이전 장면은 통째로 정리됨 */}
           {sceneId === 'playground' && <Playground key="playground" {...sceneProps} />}
+          {sceneId === 'classroom' && (
+            <Classroom
+              key="classroom"
+              {...sceneProps}
+              effectsRef={effectsRef}
+              remaining={taskUi.remaining}
+              topLabel={taskUi.topLabel}
+              onFling={fling}
+            />
+          )}
           {sceneId === 'office' && (
             <Office key="office" {...sceneProps} onNpc={handleNpc} npcBubbles={npcBubbles} npcBows={npcBows} />
           )}
@@ -242,6 +284,9 @@ export default function App() {
         laps={lapUi.laps}
         titles={lapUi.titles}
         hideBottom={!!dialog}
+        counter={counter}
+        remaining={taskUi.remaining}
+        method={taskUi.method}
       />
 
       {dialog && (
@@ -260,6 +305,18 @@ export default function App() {
         <div key={floatSnack.key} className="snack-float" onAnimationEnd={() => setFloatSnack(null)}>
           <SnackIcon snack={floatSnack.snack} size={56} />
         </div>
+      )}
+
+      {pickerOpen && (
+        <MethodPicker
+          current={taskUi.method}
+          onPick={(m) => {
+            setMethod(m)
+            setPickerOpen(false)
+            showToast(m === 'random' ? '🎲 날릴 때마다 무작위로 골라요' : '방식을 바꿨어요. 날려 볼까요?', 1600)
+          }}
+          onClose={() => setPickerOpen(false)}
+        />
       )}
 
       {bookOpen && <SnackBook collection={snackUi.collection} onClose={() => setBookOpen(false)} />}

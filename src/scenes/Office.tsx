@@ -7,7 +7,7 @@ import { Npc } from '../components/Npc'
 import { TargetRing, type TargetRingHandle } from '../components/TargetRing'
 import { CEILING_LAMPS, officeWorld } from '../data/office'
 import { NPCS, type NpcDef, type NpcId } from '../data/npcs'
-import type { Door } from '../data/scenes'
+import { SCENES, type Door } from '../data/scenes'
 import { setWorld, updatePlayer, walkTo } from '../hooks/playerStore'
 import { useTimeOfDay } from '../hooks/useTimeOfDay'
 
@@ -59,7 +59,7 @@ export function Office({ name, bubble, labelLayer, onDoor, onNpc, npcBubbles, np
       ))}
       <TargetRing ref={ring} />
       <Character name={name} bubble={bubble} labelLayer={labelLayer} />
-      <CameraRig />
+      <CameraRig scale={SCENES.office.cameraScale} />
     </>
   )
 }

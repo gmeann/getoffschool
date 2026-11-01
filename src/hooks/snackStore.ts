@@ -1,11 +1,11 @@
 import { rollSnack, type Snack } from '../data/snacks'
 import type { NpcId } from '../data/npcs'
-import { storageGet, storageRemove, storageSet, todayKey } from './clock'
+import { RESET_REQUESTED, storageGet, storageRemove, storageSet, todayKey } from './clock'
 
 /**
  * 간식 도감과 "오늘 받았는지" 기록 (localStorage).
  * 키: getoffschool:snacks = { 간식id: 개수 }, getoffschool:snackGiven = { npcId: 'YYYY-MM-DD' }
- * 개발 확인용: ?reset=1 이면 두 기록을 지우고 주소에서 reset 을 뺌
+ * 개발 확인용: ?reset=1 이면 두 기록을 지움 (clock.ts 의 RESET_REQUESTED)
  */
 
 const KEY_COLLECTION = 'snacks'
@@ -20,14 +20,9 @@ function readJson<T>(key: string, fallback: T): T {
   }
 }
 
-if (typeof window !== 'undefined') {
-  const url = new URL(window.location.href)
-  if (url.searchParams.get('reset') === '1') {
-    storageRemove(KEY_COLLECTION)
-    storageRemove(KEY_GIVEN)
-    url.searchParams.delete('reset')
-    window.history.replaceState(null, '', url.toString())
-  }
+if (RESET_REQUESTED) {
+  storageRemove(KEY_COLLECTION)
+  storageRemove(KEY_GIVEN)
 }
 
 export type SnackUi = { collection: Record<string, number>; given: Partial<Record<NpcId, string>> }

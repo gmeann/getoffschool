@@ -7,7 +7,7 @@
 export type SceneId = 'playground' | 'office' | 'classroom' | 'lab'
 
 /** 하단 알약 버튼 종류 */
-export type ActionId = 'run' | 'sit' | 'sky' | 'book' | 'greet'
+export type ActionId = 'run' | 'sit' | 'sky' | 'book' | 'greet' | 'fling' | 'method'
 
 export type Spawn = { x: number; z: number; yaw: number }
 
@@ -33,6 +33,8 @@ export type SceneDef = {
   spawnFrom?: Partial<Record<SceneId, Spawn>>
   doors: Door[]
   actions: ActionId[]
+  /** 카메라 거리 배율 (실내는 조금 가깝게) */
+  cameraScale?: number
 }
 
 export const SCENES: Record<SceneId, SceneDef> = {
@@ -64,15 +66,18 @@ export const SCENES: Record<SceneId, SceneDef> = {
     // 왼쪽 벽의 출입문
     doors: [{ id: 'exit', label: '운동장으로', x: -9, z: 3.2, yaw: Math.PI / 2, to: 'playground' }],
     actions: ['book', 'greet'],
+    cameraScale: 0.82,
   },
   classroom: {
     id: 'classroom',
     name: '교실',
-    ready: false,
-    background: '#2b2540',
-    spawn: { x: 0, z: 0, yaw: 0 },
-    doors: [],
-    actions: [],
+    ready: true,
+    background: '#2e2420',
+    spawn: { x: 7.4, z: -3.2, yaw: -Math.PI / 2 },
+    // 오른쪽 벽 앞쪽의 출입문
+    doors: [{ id: 'exit', label: '운동장으로', x: 9, z: -3.2, yaw: -Math.PI / 2, to: 'playground' }],
+    actions: ['fling', 'method'],
+    cameraScale: 0.8,
   },
   lab: {
     id: 'lab',

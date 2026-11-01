@@ -32,6 +32,19 @@ export function storageSet(key: string, value: string) {
     /* 저장 없이 진행 */
   }
 }
+/** 이름이 prefix 로 시작하는 기록을 모두 지움 (예: 'pile:' → 모든 날짜의 서류 더미) */
+export function storageRemovePrefix(prefix: string) {
+  try {
+    const keys: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k && k.startsWith(PREFIX + prefix)) keys.push(k)
+    }
+    keys.forEach((k) => localStorage.removeItem(k))
+  } catch {
+    /* 무시 */
+  }
+}
 export function storageRemove(key: string) {
   try {
     localStorage.removeItem(PREFIX + key)
@@ -39,3 +52,16 @@ export function storageRemove(key: string) {
     /* 무시 */
   }
 }
+
+/**
+ * 개발 확인용 ?reset=1: 앱이 켜질 때 한 번만 확인하고 주소에서 뺌.
+ * 각 저장소(간식·도감, 서류 더미, 카운터, 칭호)가 이 값을 보고 자기 기록을 지움.
+ */
+export const RESET_REQUESTED: boolean = (() => {
+  if (typeof window === 'undefined') return false
+  const url = new URL(window.location.href)
+  if (url.searchParams.get('reset') !== '1') return false
+  url.searchParams.delete('reset')
+  window.history.replaceState(null, '', url.toString())
+  return true
+})()

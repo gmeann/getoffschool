@@ -18,10 +18,10 @@ const ZOOM_MIN = 0.55
 const ZOOM_MAX = 1.6
 
 /** 3인칭 고정 각도 추적 카메라. 자유 회전 없음, PC 마우스 휠로 확대/축소만 */
-export function CameraRig() {
+export function CameraRig({ scale: sceneScale = 1 }: { scale?: number }) {
   const { camera, gl, size } = useThree()
   // 세로 화면(폰)에서는 가로 시야가 좁으니 조금 더 뒤로 물러남
-  const aspectScale = size.width / size.height < 1 ? 1.4 : 1
+  const aspectScale = (size.width / size.height < 1 ? 1.4 : 1) * sceneScale
   const zoom = useRef(1)
   const zoomTarget = useRef(1)
   const sit = useRef(0)

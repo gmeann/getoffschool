@@ -1,5 +1,5 @@
 import { LAP_LENGTH } from '../data/world'
-import { storageGet, storageSet, todayKey } from './clock'
+import { RESET_REQUESTED, storageGet, storageRemove, storageSet, todayKey } from './clock'
 
 /**
  * 걸음 거리 → 바퀴 수. localStorage 에 날짜별로 저장.
@@ -9,6 +9,9 @@ import { storageGet, storageSet, todayKey } from './clock'
 export const TITLE_10_LAPS = '운동장 10바퀴'
 const read = storageGet
 const write = storageSet
+
+// ?reset=1 이면 칭호도 초기화 (바퀴 수 기록은 그대로)
+if (RESET_REQUESTED) storageRemove('titles')
 
 let day = todayKey()
 let meters = Number(read(`meters:${day}`)) || 0
@@ -82,6 +85,16 @@ export function addDistance(d: number) {
     snap = { laps, titles }
     listeners.forEach((l) => l())
   }
+}
+
+/** 칭호 주기 (다른 기능에서도 사용). 이미 있으면 무시 */
+export function grantTitle(title: string) {
+  if (titles.includes(title)) return
+  titles = [...titles, title]
+  write('titles', JSON.stringify(titles))
+  snap = { ...snap, titles }
+  listeners.forEach((l) => l())
+  eventListeners.forEach((l) => l({ type: 'title', title }))
 }
 
 if (typeof window !== 'undefined') {
