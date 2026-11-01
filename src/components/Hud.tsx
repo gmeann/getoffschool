@@ -39,6 +39,9 @@ export function Hud({ sceneId, onAction, onScene, toast, player, laps, titles, h
     fling: { active: false, emoji: '📄', label: '날리기' },
     method: { active: false, emoji: METHODS.find((m) => m.id === method)?.emoji ?? '✈️', label: '방식 선택' },
     add: { active: false, emoji: '➕', label: '서류 추가' },
+    memo: { active: false, emoji: '📌', label: '메모보드' },
+    fridge: { active: false, emoji: '🧊', label: '냉장고' },
+    chalk: { active: false, emoji: '🖍️', label: '칠판' },
   }
   const flingDone = remaining <= 0
   const actions = SCENES[sceneId].actions

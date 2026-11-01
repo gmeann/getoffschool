@@ -32,6 +32,8 @@ export const player = {
   position: new THREE.Vector3(PLAYER_START.x, 0, PLAYER_START.z),
   yaw: 0,
   target: null as THREE.Vector3 | null,
+  /** 가구를 돌아가기 위한 중간 경유점 (목표 지점 전까지) */
+  path: [] as { x: number; z: number }[],
   mode: 'idle' as Mode,
   pose: 'stand' as Pose,
   /** 앉으러 가는 / 앉아 있는 자리 */
@@ -65,6 +67,7 @@ export function resetForScene(spawn: Spawn) {
   player.bowTime = 0
   player.interact = null
   player.seat = null
+  player.path = []
   emitUi()
 }
 
@@ -141,6 +144,88 @@ function lerpAngle(a: number, b: number, t: number) {
   return a + diff * t
 }
 
+// ---------- 길찾기: 사각형 가구의 모서리를 경유해 돌아가기 ----------
+const PATH_PAD = PLAYER_RADIUS + 0.12
+
+/** 선분이 (넓힌) 사각형 안을 지나는지: 슬랩 방식 */
+function segmentHitsBox(ax: number, az: number, bx: number, bz: number, b: { minX: number; maxX: number; minZ: number; maxZ: number }, pad: number) {
+  const minX = b.minX - pad
+  const maxX = b.maxX + pad
+  const minZ = b.minZ - pad
+  const maxZ = b.maxZ + pad
+  let t0 = 0
+  let t1 = 1
+  const dx = bx - ax
+  const dz = bz - az
+  const clip = (p: number, q: number) => {
+    if (Math.abs(p) < 1e-9) return q >= 0
+    const r = q / p
+    if (p < 0) {
+      if (r > t1) return false
+      if (r > t0) t0 = r
+    } else {
+      if (r < t0) return false
+      if (r < t1) t1 = r
+    }
+    return true
+  }
+  if (!clip(-dx, ax - minX) || !clip(dx, maxX - ax) || !clip(-dz, az - minZ) || !clip(dz, maxZ - az)) return false
+  return t1 - t0 > 1e-4
+}
+
+function clear(a: { x: number; z: number }, b: { x: number; z: number }) {
+  // 경유점이 모서리에 딱 붙어 있으므로 검사할 때는 살짝 덜 넓힘
+  return !world.boxes.some((bx) => segmentHitsBox(a.x, a.z, b.x, b.z, bx, PLAYER_RADIUS - 0.02))
+}
+
+function insideBounds(p: { x: number; z: number }) {
+  const bd = world.bounds
+  if (bd.kind === 'circle') return Math.hypot(p.x, p.z) < bd.r - PLAYER_RADIUS
+  return p.x > bd.minX + PLAYER_RADIUS && p.x < bd.maxX - PLAYER_RADIUS && p.z > bd.minZ + PLAYER_RADIUS && p.z < bd.maxZ - PLAYER_RADIUS
+}
+
+/** 시작→목표가 막혀 있으면 모서리 경유점 목록을 돌려줌 (다익스트라, 노드는 수십 개 수준) */
+function planPath(from: { x: number; z: number }, to: { x: number; z: number }): { x: number; z: number }[] {
+  if (world.boxes.length === 0 || clear(from, to)) return []
+  const nodes: { x: number; z: number }[] = [from, to]
+  for (const b of world.boxes) {
+    for (const [x, z] of [
+      [b.minX - PATH_PAD, b.minZ - PATH_PAD],
+      [b.maxX + PATH_PAD, b.minZ - PATH_PAD],
+      [b.minX - PATH_PAD, b.maxZ + PATH_PAD],
+      [b.maxX + PATH_PAD, b.maxZ + PATH_PAD],
+    ]) {
+      const c = { x, z }
+      const blocked = world.boxes.some((o) => c.x > o.minX - PLAYER_RADIUS && c.x < o.maxX + PLAYER_RADIUS && c.z > o.minZ - PLAYER_RADIUS && c.z < o.maxZ + PLAYER_RADIUS)
+      if (!blocked && insideBounds(c)) nodes.push(c)
+    }
+  }
+  const n = nodes.length
+  const dist = new Array(n).fill(Infinity)
+  const prev = new Array(n).fill(-1)
+  const done = new Array(n).fill(false)
+  dist[0] = 0
+  for (let k = 0; k < n; k++) {
+    let u = -1
+    for (let i = 0; i < n; i++) if (!done[i] && (u < 0 || dist[i] < dist[u])) u = i
+    if (u < 0 || dist[u] === Infinity) break
+    if (u === 1) break
+    done[u] = true
+    for (let v = 0; v < n; v++) {
+      if (done[v] || v === u) continue
+      const w = Math.hypot(nodes[u].x - nodes[v].x, nodes[u].z - nodes[v].z)
+      if (dist[u] + w < dist[v] && clear(nodes[u], nodes[v])) {
+        dist[v] = dist[u] + w
+        prev[v] = u
+      }
+    }
+  }
+  if (prev[1] < 0) return [] // 길이 없으면 그냥 직진 (미끄러지며 감)
+  const path: { x: number; z: number }[] = []
+  for (let v = prev[1]; v > 0; v = prev[v]) path.unshift(nodes[v])
+  return path
+}
+
 // ---------- 명령 ----------
 function standUp() {
   if (player.mode !== 'sit') return
@@ -184,6 +269,7 @@ export function walkTo(point: { x: number; z: number }, interact?: Interact) {
   const t = new THREE.Vector3(point.x, 0, point.z)
   resolveCollisions(t, 0.05)
   player.target = t
+  player.path = planPath(player.position, t)
   player.mode = 'walk'
   player.stuckTime = 0
   emitUi()
@@ -245,6 +331,7 @@ export function toggleSit() {
   }
   player.seat = best
   player.target = new THREE.Vector3(best.front.x, 0, best.front.z)
+  player.path = planPath(player.position, best.front)
   player.mode = 'toSeat'
   player.skyLook = false
   player.stuckTime = 0
@@ -307,10 +394,16 @@ export function updatePlayer(rawDt: number) {
     return
   }
 
-  const dx = target.x - p.x
-  const dz = target.z - p.z
+  // 경유점이 있으면 먼저 그쪽으로 (가까워지면 다음 경유점)
+  let goal: { x: number; z: number } = target
+  if (player.mode !== 'run') {
+    while (player.path.length && Math.hypot(player.path[0].x - p.x, player.path[0].z - p.z) < 0.25) player.path.shift()
+    if (player.path.length) goal = player.path[0]
+  }
+  const dx = goal.x - p.x
+  const dz = goal.z - p.z
   const dist = Math.hypot(dx, dz)
-  if (player.mode !== 'run' && dist < ARRIVE_EPS) {
+  if (player.mode !== 'run' && !player.path.length && dist < ARRIVE_EPS) {
     arrive()
     return
   }
@@ -355,6 +448,7 @@ export function updatePlayer(rawDt: number) {
 }
 
 function arrive() {
+  player.path = []
   // 막혀서 멈췄더라도 목적지 근처면 상호작용 실행
   const it = player.interact
   player.interact = null
@@ -375,6 +469,7 @@ function arrive() {
 }
 
 function stop() {
+  player.path = []
   player.mode = 'idle'
   player.pose = 'stand'
   player.target = null
@@ -383,5 +478,5 @@ function stop() {
 
 // 개발 중 확인용 (배포 빌드에는 들어가지 않음)
 if (import.meta.env.DEV && typeof window !== 'undefined') {
-  Object.assign(window, { __player: player, __addDistance: addDistance })
+  Object.assign(window, { __player: player, __addDistance: addDistance, __walkTo: walkTo })
 }

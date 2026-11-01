@@ -5,7 +5,7 @@
 - Vite + React + TypeScript
 - three, @react-three/fiber, @react-three/drei
 - 서버·DB·외부 모델/텍스처 파일 없음. 모든 물체는 기본 도형으로 코드에서 만듭니다.
-  (글꼴만 Pretendard 웹폰트를 CDN에서 불러오고, 실패하면 시스템 글꼴을 씁니다.)
+  (글꼴만 Pretendard(본문)·Gaegu(손글씨·분필) 웹폰트를 CDN에서 불러오고, 실패하면 시스템 글꼴을 씁니다.)
 
 ## 실행 방법
 
@@ -58,10 +58,11 @@ npm run preview
 
 ## 공간 이동 (3단계)
 
-- 공간은 한 번에 하나만 불러와요: `playground`(운동장), `office`(교무실), `classroom`(교실), `lab`(연구실, 준비 중).
+- 공간은 한 번에 하나만 불러와요: `playground`(운동장), `office`(교무실), `classroom`(교실), `lab`(연구실). 4개 공간이 모두 열려 있어요.
 - 공간 정의(이름, 배경색, 입장 위치, 문 위치, 하단 버튼)는 `src/data/scenes.ts` 한 곳에서 관리해요.
-- 운동장 북쪽 학교 건물의 문(교무실·교실·연구실)을 누르면 문 앞까지 걸어가서 들어가요. 준비 중인 문(연구실)은 "준비 중이에요" 말풍선만 떠요.
+- 운동장 북쪽 학교 건물의 문(교무실·교실·연구실)을 누르면 문 앞까지 걸어가서 들어가요.
 - 좌상단 "퇴근길 학교 | 공간이름"을 누르면 공간 목록이 펼쳐져요.
+- 바닥이나 물건을 누르면 가구를 돌아서 걸어가요 (사각형 가구 모서리를 경유하는 간단한 길찾기).
 
 ### 교무실
 
@@ -84,6 +85,20 @@ npm run preview
   - 지금은 localStorage 구현이고, 나중에 서버 공유 값으로 바꿀 때는 같은 인터페이스의 구현을 만들어 파일 맨 아래 `counterService` 한 줄만 바꾸면 돼요.
 - 저장 위치: `getoffschool:pile:날짜`(남은 기본 서류), `getoffschool:custom:날짜`(내가 올린 서류), `getoffschool:flung:날짜`·`getoffschool:flungTotal`(카운터), `getoffschool:flingMethod`(방식)
 
+### 연구실 (5단계)
+
+- 책장, 큰 작업 테이블(노트북·머그컵), 러그, 화분 + 상호작용 오브젝트 3개. 가까이 가면 테두리가 반짝이고 "눌러서 열기"가 떠요.
+  - 📌 **메모보드**: 수업 아이디어와 꿀팁 · 반응 "써볼게요" · 포스트잇 색 4가지
+  - 🧊 **냉장고**: 간식, 선물, 맛집 추천 · 반응 "맛있겠다" · 추천 이유 한 줄
+  - 🖍️ **칠판**: 오늘의 한마디 · 반응 "나도 그래요" · 분필 글씨체
+- 오브젝트나 하단 버튼을 누르면 앞까지 걸어가서 하단 시트 패널이 열려요. 최신순/공감 많은 순, 반응은 한 글에 한 번(다시 누르면 취소).
+- **글 남기기 규칙**: 60자 이하(줄바꿈 없음), 완전 익명(무작위 이름 또는 "익명의 선생님"), 개인정보 안내 고정, 금지어·전화번호·이메일 차단(`src/data/bannedWords.ts`), 올린 뒤 30초 동안 연속 입력 제한, 내 글만 삭제. 글은 텍스트로만 그려요(HTML 해석 없음).
+- 시드 글: 게시판마다 15개 (`src/data/boards.ts`), 반응 수 3~40.
+- **데이터 접근**: 글·반응·삭제는 `src/services/boardService.ts` 하나로만 해요. 화면은 localStorage 를 직접 다루지 않아요.
+  - 인터페이스: `getPosts(board, sort)`, `addPost(board, post)`, `toggleReaction(board, postId)`, `deleteMyPost(board, postId)`, `getCooldownRemaining()` — 모두 Promise
+  - 6단계에서 같은 인터페이스의 Firebase 구현을 만들어 파일 맨 아래 `boardService` 한 줄만 바꾸면 돼요.
+- 저장 위치: `getoffschool:board:posts:게시판`(내 글), `getoffschool:board:reacted`(내 반응), `getoffschool:board:lastPostAt`(연속 입력 제한), `getoffschool:guide:lab`(첫 안내)
+
 ### 개발용: 시간대 강제로 바꾸기
 
 주소 뒤에 `?time=` 을 붙이면 돼요.
@@ -97,7 +112,7 @@ npm run preview
 ### 개발용: 날짜 바꾸기 / 기록 초기화
 
 - `?date=2026-11-02`: 오늘 날짜를 그 날짜로 강제 (하루 한 번 간식 제한 확인용)
-- `?reset=1`: 도감·간식 기록, 교실 서류 더미(내가 올린 서류 포함), 날린 업무 카운터, 칭호를 지움 (바퀴 수는 그대로, 지운 뒤 주소에서 `reset` 은 저절로 빠져요)
+- `?reset=1`: 도감·간식 기록, 교실 서류 더미(내가 올린 서류 포함), 날린 업무 카운터, 칭호, 연구실 데이터(내 글·반응·첫 안내)를 지움 (바퀴 수는 그대로, 지운 뒤 주소에서 `reset` 은 저절로 빠져요)
 - 함께 쓸 수도 있어요: `?time=night&date=2026-11-02`
 
 ## 배포 (GitHub Pages)
@@ -125,9 +140,9 @@ BASE_PATH=/my-repo/ npm run build
 ```
 src/
   components/  3D 물체(하늘, 바닥, 나무, 가로등, 벤치, 캐릭터, 카메라)와 HUD
-  scenes/      장면 조립 (Playground = 운동장, Office = 교무실, Classroom = 교실)
-  services/    나중에 서버로 바꿀 수 있는 모듈 (counterService)
+  scenes/      장면 조립 (Playground = 운동장, Office = 교무실, Classroom = 교실, Lab = 연구실)
+  services/    나중에 서버로 바꿀 수 있는 모듈 (counterService, boardService) + 글 검사(moderation)
   hooks/       내 캐릭터 상태·이동(playerStore), 바퀴 수 저장(lapStore), 시간대(useTimeOfDay)
-  data/        공간 정의(scenes), NPC·대사, 간식, 업무 라벨·문구, 오늘의 한마디, 시간대 색, 배치·충돌 영역
+  data/        공간 정의(scenes), NPC·대사, 간식, 업무 라벨·문구, 오늘의 한마디, 게시판 설정·시드 글, 금지어, 시간대 색, 배치·충돌 영역
 
 ```

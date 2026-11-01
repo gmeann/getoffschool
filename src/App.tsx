@@ -3,6 +3,11 @@ import { Canvas } from '@react-three/fiber'
 import { Playground } from './scenes/Playground'
 import { Office } from './scenes/Office'
 import { Classroom } from './scenes/Classroom'
+import { Lab } from './scenes/Lab'
+import { BoardPanel } from './components/BoardPanel'
+import { LAB_OBJECTS } from './data/lab'
+import type { BoardId } from './data/boards'
+import { markLabGuideSeen, shouldShowLabGuide } from './hooks/onboarding'
 import { MethodPicker } from './components/MethodPicker'
 import { AddPaper } from './components/AddPaper'
 import { pileTop } from './components/PaperPile'
@@ -53,6 +58,8 @@ export default function App() {
   const [bookOpen, setBookOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
+  const [boardOpen, setBoardOpen] = useState<BoardId | null>(null)
+  const [labGuide, setLabGuide] = useState(false)
   const effectsRef = useRef<TaskEffectsHandle | null>(null)
   const [floatSnack, setFloatSnack] = useState<{ snack: Snack; key: number } | null>(null)
   const [npcBubbles, setNpcBubbles] = useState<Partial<Record<NpcId, string>>>({})
@@ -109,6 +116,7 @@ export default function App() {
       setBookOpen(false)
       setPickerOpen(false)
       setAddOpen(false)
+      setBoardOpen(null)
       setFading(true)
       window.setTimeout(() => {
         // 화면이 완전히 어두워진 뒤 장면 교체 (이전 장면은 언마운트되며 자원 정리)
@@ -201,6 +209,17 @@ export default function App() {
     }, 350)
   }, [showBubble, showNpcBubble])
 
+  // ---------- 연구실 게시판 ----------
+  const openBoard = useCallback((b: BoardId) => {
+    const o = LAB_OBJECTS[b]
+    walkTo(o.front, { x: o.x, z: o.z, radius: 2.0, onArrive: () => setBoardOpen(b) })
+  }, [])
+
+  // 연구실에 처음 들어오면 한 번만 안내
+  useEffect(() => {
+    if (sceneId === 'lab' && shouldShowLabGuide()) setLabGuide(true)
+  }, [sceneId])
+
   // ---------- 업무 날리기 ----------
   const fling = useCallback(() => {
     const before = getTaskUi().remaining
@@ -235,13 +254,17 @@ export default function App() {
           return setPickerOpen(true)
         case 'add':
           return setAddOpen(true)
+        case 'memo':
+        case 'fridge':
+        case 'chalk':
+          return openBoard(action)
         case 'sound':
           return showToast(`소리는 ${SOON}`)
         default:
           return showToast(SOON)
       }
     },
-    [showToast, greet, fling],
+    [showToast, greet, fling, openBoard],
   )
 
   const sceneProps = { name, bubble, labelLayer, onDoor: handleDoor }
@@ -274,6 +297,7 @@ export default function App() {
               onFling={fling}
             />
           )}
+          {sceneId === 'lab' && <Lab key="lab" {...sceneProps} onBoard={openBoard} />}
           {sceneId === 'office' && (
             <Office key="office" {...sceneProps} onNpc={handleNpc} npcBubbles={npcBubbles} npcBows={npcBows} />
           )}
@@ -289,7 +313,7 @@ export default function App() {
         player={playerUi}
         laps={lapUi.laps}
         titles={lapUi.titles}
-        hideBottom={!!dialog}
+        hideBottom={!!dialog || !!boardOpen}
         counter={counter}
         remaining={taskUi.remaining}
         method={taskUi.method}
@@ -336,6 +360,32 @@ export default function App() {
           }}
           onClose={() => setAddOpen(false)}
         />
+      )}
+
+      {boardOpen && <BoardPanel key={boardOpen} board={boardOpen} myName={name} onClose={() => setBoardOpen(null)} />}
+
+      {labGuide && (
+        <div className="modal-backdrop" onClick={() => (markLabGuideSeen(), setLabGuide(false))}>
+          <div className="guide-card" role="dialog" aria-label="연구실 안내" onClick={(e) => e.stopPropagation()}>
+            <div className="guide-emoji" aria-hidden>
+              📌🧊🖍️
+            </div>
+            <p>
+              여기서 선생님들의 한마디를 읽고 남길 수 있어요.
+              <br />
+              개인정보는 적지 않아요.
+            </p>
+            <button
+              className="dialog-btn primary"
+              onClick={() => {
+                markLabGuideSeen()
+                setLabGuide(false)
+              }}
+            >
+              알겠어요
+            </button>
+          </div>
+        </div>
       )}
 
       {bookOpen && <SnackBook collection={snackUi.collection} onClose={() => setBookOpen(false)} />}

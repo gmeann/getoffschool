@@ -279,16 +279,17 @@ export function CeilingLamps({ list, height }: { list: { x: number; z: number }[
     <>
       {list.map((l, i) => (
         <group key={i} position={[l.x, height, l.z]}>
-          <mesh position={[0, -0.25, 0]}>
-            <cylinderGeometry args={[0.008, 0.008, 0.5, 4]} />
+          {/* 위에서 내려다보는 카메라를 덜 가리도록 짧고 작게 */}
+          <mesh position={[0, -0.15, 0]}>
+            <cylinderGeometry args={[0.008, 0.008, 0.3, 4]} />
             <meshStandardMaterial color="#3a3030" />
           </mesh>
-          <mesh position={[0, -0.55, 0]}>
-            <coneGeometry args={[0.32, 0.22, 12, 1, true]} />
+          <mesh position={[0, -0.36, 0]}>
+            <coneGeometry args={[0.22, 0.16, 12, 1, true]} />
             <meshStandardMaterial color="#e9d3b0" side={THREE.DoubleSide} />
           </mesh>
-          <mesh position={[0, -0.63, 0]}>
-            <sphereGeometry args={[0.11, 10, 8]} />
+          <mesh position={[0, -0.42, 0]}>
+            <sphereGeometry args={[0.08, 10, 8]} />
             <meshStandardMaterial color="#fff2cf" emissive="#ffd38a" emissiveIntensity={2} toneMapped={false} />
           </mesh>
         </group>
