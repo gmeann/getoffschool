@@ -4,10 +4,11 @@ import { Playground } from './scenes/Playground'
 import { Office } from './scenes/Office'
 import { Classroom } from './scenes/Classroom'
 import { MethodPicker } from './components/MethodPicker'
+import { AddPaper } from './components/AddPaper'
 import { pileTop } from './components/PaperPile'
 import type { TaskEffectsHandle } from './components/TaskEffects'
 import { TITLE_DONE } from './data/tasks'
-import { flingOne, getTaskUi, setMethod, subscribeTasks } from './hooks/taskStore'
+import { addCustomPaper, flingOne, getTaskUi, setMethod, subscribeTasks } from './hooks/taskStore'
 import { counterService } from './services/counterService'
 import { Hud, type HudAction } from './components/Hud'
 import { DialogSheet } from './components/DialogSheet'
@@ -51,6 +52,7 @@ export default function App() {
   const [dialog, setDialog] = useState<Dialog | null>(null)
   const [bookOpen, setBookOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
   const effectsRef = useRef<TaskEffectsHandle | null>(null)
   const [floatSnack, setFloatSnack] = useState<{ snack: Snack; key: number } | null>(null)
   const [npcBubbles, setNpcBubbles] = useState<Partial<Record<NpcId, string>>>({})
@@ -106,6 +108,7 @@ export default function App() {
       setDialog(null)
       setBookOpen(false)
       setPickerOpen(false)
+      setAddOpen(false)
       setFading(true)
       window.setTimeout(() => {
         // 화면이 완전히 어두워진 뒤 장면 교체 (이전 장면은 언마운트되며 자원 정리)
@@ -203,7 +206,7 @@ export default function App() {
     const before = getTaskUi().remaining
     const r = flingOne()
     if (!r) {
-      showToast('오늘 서류는 다 날렸어요. 내일 또 쌓일 거예요 🌙', 2200)
+      showToast('오늘 서류는 다 날렸어요. 내일 또 쌓여요 🌙 (서류 추가로 더 올릴 수도 있어요)', 2600)
       return
     }
     effectsRef.current?.play(r.method, r.label, pileTop(before))
@@ -230,6 +233,8 @@ export default function App() {
           return fling()
         case 'method':
           return setPickerOpen(true)
+        case 'add':
+          return setAddOpen(true)
         case 'sound':
           return showToast(`소리는 ${SOON}`)
         default:
@@ -264,6 +269,7 @@ export default function App() {
               {...sceneProps}
               effectsRef={effectsRef}
               remaining={taskUi.remaining}
+              custom={taskUi.custom}
               topLabel={taskUi.topLabel}
               onFling={fling}
             />
@@ -316,6 +322,19 @@ export default function App() {
             showToast(m === 'random' ? '🎲 날릴 때마다 무작위로 골라요' : '방식을 바꿨어요. 날려 볼까요?', 1600)
           }}
           onClose={() => setPickerOpen(false)}
+        />
+      )}
+
+      {addOpen && (
+        <AddPaper
+          customCount={taskUi.custom}
+          onAdd={(name) => {
+            const r = addCustomPaper(name)
+            if (!r.ok) return r.reason
+            showToast(`📄 '${r.label.name}' 서류를 더미 맨 위에 올렸어요`, 2000)
+            return null
+          }}
+          onClose={() => setAddOpen(false)}
         />
       )}
 

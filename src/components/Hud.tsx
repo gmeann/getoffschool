@@ -28,7 +28,7 @@ type Props = {
 export function Hud({ sceneId, onAction, onScene, toast, player, laps, titles, hideBottom, counter, remaining, method }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const running = player.mode === 'run'
-  const sitting = player.mode === 'sit' || player.mode === 'toBench'
+  const sitting = player.mode === 'sit' || player.mode === 'toSeat'
 
   const ALL: Record<ActionId, { active: boolean; emoji: string; label: string }> = {
     run: { active: running, emoji: running ? '✋' : '🏃', label: running ? '멈추기' : '뛰기' },
@@ -38,6 +38,7 @@ export function Hud({ sceneId, onAction, onScene, toast, player, laps, titles, h
     greet: { active: false, emoji: '🙏', label: '인사하기' },
     fling: { active: false, emoji: '📄', label: '날리기' },
     method: { active: false, emoji: METHODS.find((m) => m.id === method)?.emoji ?? '✈️', label: '방식 선택' },
+    add: { active: false, emoji: '➕', label: '서류 추가' },
   }
   const flingDone = remaining <= 0
   const actions = SCENES[sceneId].actions
@@ -133,7 +134,7 @@ export function Hud({ sceneId, onAction, onScene, toast, player, laps, titles, h
       {toast && <div className="toast">{toast}</div>}
 
       {!hideBottom && (
-        <div className="hud-bottom">
+        <div className={`hud-bottom ${actions.length >= 4 ? 'many' : ''}`}>
           {actions.map((id) => {
             const a = ALL[id]
             return (

@@ -2,6 +2,14 @@
 
 /** 하루에 쌓이는 서류 장수 */
 export const DAILY_PAPERS = 20
+/** 내가 직접 추가할 수 있는 서류 최대 장수 (하루) */
+export const MAX_CUSTOM_PAPERS = 20
+/** 내가 추가한 서류 이름 최대 글자 수 */
+export const CUSTOM_NAME_MAX = 14
+/** 직접 추가한 서류의 띠 색 (차례로 돌아가며) */
+export const CUSTOM_COLORS = ['#f2a65a', '#4ab0d9', '#b07ad9', '#5bb07a', '#e05a5a', '#e0a030']
+/** 서류 추가 창의 추천 이름 */
+export const CUSTOM_SUGGESTIONS = ['내일 수업 준비', '학급 단톡 답장', '알림장 쓰기', '채점 마무리', '교실 정리', '공개수업 지도안']
 
 export type TaskLabel = { name: string; color: string }
 

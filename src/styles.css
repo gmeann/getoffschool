@@ -481,3 +481,54 @@ button.pill:active { transform: scale(0.94); }
   .method-emoji { font-size: 26px; }
   .method-name { font-size: 15px; }
 }
+
+/* ---------- 버그 수정: 서류 추가 / 하단 버튼 4개 ---------- */
+.pile-tag em { font-style: normal; font-size: 11px; font-weight: 700; color: #e08a3a; background: rgba(242, 166, 90, 0.15); padding: 1px 6px; border-radius: 999px; }
+.add-paper {
+  width: min(480px, 100%);
+  padding: 18px;
+  border-radius: 24px;
+  background: #fff9f1;
+  color: #3a2f52;
+  box-shadow: 0 20px 50px rgba(20, 12, 40, 0.4);
+}
+.add-form { display: flex; gap: 8px; }
+.add-input {
+  flex: 1;
+  min-width: 0;
+  height: 46px;
+  padding: 0 16px;
+  border: 2px solid #f1e4d4;
+  border-radius: 999px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  font-size: 16px; /* 16px 이상이라 iOS 에서 확대되지 않음 */
+  user-select: text;
+  -webkit-user-select: text;
+}
+.add-input:focus { outline: none; border-color: #f2a65a; }
+.add-form .dialog-btn { flex: none; padding: 0 20px; }
+.add-meta { display: flex; justify-content: space-between; margin: 8px 4px 12px; font-size: 12px; opacity: 0.7; }
+.add-error { color: #d0453a; opacity: 1; font-weight: 700; }
+.add-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.add-chip {
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(58, 47, 82, 0.07);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.add-chip:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.hud-bottom.many { flex-wrap: wrap; }
+@media (max-width: 480px) {
+  .hud-bottom.many { gap: 6px; }
+  .hud-bottom.many .pill.action { height: 42px; padding: 0 13px; font-size: 13px; gap: 4px; }
+  /* 버튼이 4개일 때 폰에서는 이모지를 빼서 한 줄에 들어가게 */
+  .hud-bottom.many .pill.action > span[aria-hidden] { display: none; }
+}

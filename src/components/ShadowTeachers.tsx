@@ -37,7 +37,7 @@ const rand = (a: number, b: number) => a + Math.random() * (b - a)
 /** 접속할 때마다 인원·속도·위치가 조금씩 달라짐 */
 function makeSpecs(myName: string): Spec[] {
   const count = 6 + Math.floor(Math.random() * 3) // 6~8명
-  const sitters = Math.min(BENCHES.length, 1 + Math.floor(Math.random() * 2)) // 1~2명
+  const sitters = Math.min(BENCHES.length, 1 + Math.floor(Math.random() * 3)) // 1~3명
   const names = NICKNAMES.filter((n) => n !== myName).sort(() => Math.random() - 0.5)
   const benchOrder = BENCHES.map((_, i) => i).sort(() => Math.random() - 0.5)
   return Array.from({ length: count }, (_, i) => {

@@ -19,12 +19,13 @@ type Props = {
   onDoor: (door: Door) => void
   effectsRef: RefObject<TaskEffectsHandle | null>
   remaining: number
+  custom: number
   topLabel: TaskLabel | null
   onFling: () => void
 }
 
 /** 교실 장면: 칠판·학생 책상·내 업무 책상 + 업무 날리기 */
-export function Classroom({ name, bubble, labelLayer, onDoor, effectsRef, remaining, topLabel, onFling }: Props) {
+export function Classroom({ name, bubble, labelLayer, onDoor, effectsRef, remaining, custom, topLabel, onFling }: Props) {
   const ring = useRef<TargetRingHandle>(null)
   const sky = useTimeOfDay()
 
@@ -52,7 +53,7 @@ export function Classroom({ name, bubble, labelLayer, onDoor, effectsRef, remain
       <group onClick={handleFloorClick}>
         <ClassroomRoom sky={sky} onDoor={onDoor} labelLayer={labelLayer} />
       </group>
-      <PaperPile remaining={remaining} topLabel={topLabel} onFling={onFling} labelLayer={labelLayer} />
+      <PaperPile remaining={remaining} custom={custom} topLabel={topLabel} onFling={onFling} labelLayer={labelLayer} />
       <TaskEffects ref={effectsRef} />
       <TargetRing ref={ring} />
       <Character name={name} bubble={bubble} labelLayer={labelLayer} />

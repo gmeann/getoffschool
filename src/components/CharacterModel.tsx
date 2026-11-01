@@ -106,7 +106,7 @@ export const SIT_LIFT = 0.24
 /**
  * @param stride 걸음 빠르기 배율 (천천히 걷는 캐릭터는 1보다 작게)
  */
-export function animateBody(r: BodyRefs, a: AnimState, pose: Pose, dt: number, stride = 1) {
+export function animateBody(r: BodyRefs, a: AnimState, pose: Pose, dt: number, stride = 1, sitLift = SIT_LIFT) {
   const damp = THREE.MathUtils.damp
   a.walk = damp(a.walk, pose === 'walk' ? 1 : 0, 10, dt)
   a.run = damp(a.run, pose === 'run' ? 1 : 0, 10, dt)
@@ -120,18 +120,20 @@ export function animateBody(r: BodyRefs, a: AnimState, pose: Pose, dt: number, s
   const bob = Math.abs(s) * (0.06 * a.walk + 0.13 * a.run)
 
   if (r.body.current) {
-    r.body.current.position.y = bob + a.sit * SIT_LIFT
+    r.body.current.position.y = bob + a.sit * sitLift
     r.body.current.rotation.x = 0.2 * a.run + 0.5 * a.bow // 달릴 때 앞으로 기울임, 인사할 때 숙임
     r.body.current.rotation.z = s * 0.04 * moving
   }
-  if (r.legs.current) r.legs.current.position.y = bob * 0.5 + a.sit * SIT_LIFT
+  if (r.legs.current) r.legs.current.position.y = bob * 0.5 + a.sit * sitLift
+  // 바닥에 앉으면 두 팔을 뒤로 짚음, 의자·벤치는 무릎 위에
+  const armSit = sitLift < 0 ? 0.75 : -0.45
   // 인사: 두 손을 가슴 앞에 모음
   if (r.armL.current) {
-    r.armL.current.rotation.x = swing - a.sit * 0.45 - a.bow * 1.1
+    r.armL.current.rotation.x = swing + a.sit * armSit - a.bow * 1.1
     r.armL.current.rotation.z = a.bow * 0.55
   }
   if (r.armR.current) {
-    r.armR.current.rotation.x = -swing - a.sit * 0.45 - a.bow * 1.1
+    r.armR.current.rotation.x = -swing + a.sit * armSit - a.bow * 1.1
     r.armR.current.rotation.z = -a.bow * 0.55
   }
   if (r.legL.current) r.legL.current.rotation.x = -swing * 0.8 - a.sit * 1.45

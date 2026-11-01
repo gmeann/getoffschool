@@ -7,7 +7,7 @@
 export type SceneId = 'playground' | 'office' | 'classroom' | 'lab'
 
 /** 하단 알약 버튼 종류 */
-export type ActionId = 'run' | 'sit' | 'sky' | 'book' | 'greet' | 'fling' | 'method'
+export type ActionId = 'run' | 'sit' | 'sky' | 'book' | 'greet' | 'fling' | 'method' | 'add'
 
 export type Spawn = { x: number; z: number; yaw: number }
 
@@ -76,7 +76,7 @@ export const SCENES: Record<SceneId, SceneDef> = {
     spawn: { x: 7.4, z: -3.2, yaw: -Math.PI / 2 },
     // 오른쪽 벽 앞쪽의 출입문
     doors: [{ id: 'exit', label: '운동장으로', x: 9, z: -3.2, yaw: -Math.PI / 2, to: 'playground' }],
-    actions: ['fling', 'method'],
+    actions: ['fling', 'method', 'add', 'sit'],
     cameraScale: 0.8,
   },
   lab: {

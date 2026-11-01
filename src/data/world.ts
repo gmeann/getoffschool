@@ -4,11 +4,27 @@ export type Circle = { x: number; z: number; r: number }
 /** 축에 나란한 사각형 충돌 영역 */
 export type Box = { minX: number; maxX: number; minZ: number; maxZ: number }
 /** 장면마다 다른 충돌 정보 */
+/**
+ * 앉을 수 있는 자리.
+ * x,z,yaw: 앉았을 때 위치·방향 (yaw 가 null 이면 지금 바라보는 방향 그대로)
+ * front: 걸어가서 멈출 자리, lift: 몸을 올리는 높이 (벤치 0.24, 바닥은 음수)
+ */
+export type Seat = { x: number; z: number; yaw: number | null; front: { x: number; z: number }; lift: number }
+
+/** 장면마다 다른 충돌·앉을 자리 정보 */
 export type World = {
   circles: Circle[]
   boxes: Box[]
   bounds: { kind: 'circle'; r: number } | ({ kind: 'rect' } & Box)
+  /** 걸은 거리를 바퀴 수로 셀지 (운동장만) */
+  countLaps?: boolean
+  seats?: Seat[]
+  /** 바닥에 바로 앉을 수 있는 타원 잔디밭 */
+  lawn?: { rx: number; rz: number }
 }
+
+/** 바닥(잔디)에 앉을 때 몸을 내리는 높이 */
+export const GROUND_SIT_LIFT = -0.22
 
 /** 캐릭터가 걸어 다닐 수 있는 원형 경계 */
 export const WORLD_RADIUS = 34
@@ -72,7 +88,14 @@ export const LAMPS: { x: number; z: number }[] = [
 export const BENCHES: { x: number; z: number; rotY: number }[] = [
   { x: 3, z: 12.5, rotY: Math.PI },
   { x: -4, z: -12.6, rotY: 0 },
+  { x: -17.6, z: 0, rotY: Math.PI / 2 },
+  { x: 17.6, z: -1, rotY: -Math.PI / 2 },
+  { x: -10, z: 11.6, rotY: Math.PI },
+  { x: 9.5, z: -12.2, rotY: 0 },
 ]
+
+/** 트랙 안쪽 가운데 잔디밭 (타원 반지름). 여기서는 어디든 바닥에 앉을 수 있음 */
+export const LAWN = { rx: 10.2, rz: 4.8 }
 
 /** 벤치 좌석 (벤치 기준 좌우 위치). 0번은 그림자 선생님, 1번은 내 자리 */
 export const SEAT_X = [-0.5, 0.5]
@@ -115,6 +138,13 @@ export const PLAYGROUND_WORLD: World = {
   circles: OBSTACLES,
   boxes: [BUILDING_BOX],
   bounds: { kind: 'circle', r: WORLD_RADIUS },
+  countLaps: true,
+  // 벤치마다 오른쪽 자리(1번)가 내 자리
+  seats: BENCHES.map((_, i) => {
+    const s = seatInfo(i, 1)
+    return { x: s.seat.x, z: s.seat.z, yaw: s.yaw, front: s.front, lift: 0.24 }
+  }),
+  lawn: LAWN,
 }
 
 /** 우상단 "오늘 N명" (지금은 임의의 고정 숫자) */

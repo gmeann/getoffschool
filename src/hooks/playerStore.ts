@@ -1,11 +1,11 @@
 import * as THREE from 'three'
 import {
-  BENCHES,
+  GROUND_SIT_LIFT,
   PLAYER_START,
   PLAYGROUND_WORLD,
   laneAngleOf,
   lanePoint,
-  seatInfo,
+  type Seat,
   type World,
 } from '../data/world'
 import type { Spawn } from '../data/scenes'
@@ -17,7 +17,7 @@ import { addDistance } from './lapStore'
  * - 버튼 글자처럼 UI 에 필요한 값(mode, skyLook)만 구독(subscribe)으로 알림
  */
 
-export type Mode = 'idle' | 'walk' | 'run' | 'toBench' | 'sit'
+export type Mode = 'idle' | 'walk' | 'run' | 'toSeat' | 'sit'
 export type Pose = 'stand' | 'walk' | 'run' | 'sit' | 'bow'
 
 const WALK_SPEED = 2.2
@@ -34,7 +34,10 @@ export const player = {
   target: null as THREE.Vector3 | null,
   mode: 'idle' as Mode,
   pose: 'stand' as Pose,
-  benchIndex: -1,
+  /** 앉으러 가는 / 앉아 있는 자리 */
+  seat: null as Seat | null,
+  /** 앉았을 때 몸 높이 (벤치·의자는 위로, 잔디는 아래로) */
+  sitLift: 0.24,
   skyLook: false,
   stuckTime: 0,
   /** 인사(고개 숙이기) 남은 시간 */
@@ -61,6 +64,7 @@ export function resetForScene(spawn: Spawn) {
   player.skyLook = false
   player.bowTime = 0
   player.interact = null
+  player.seat = null
   emitUi()
 }
 
@@ -140,10 +144,24 @@ function lerpAngle(a: number, b: number, t: number) {
 // ---------- 명령 ----------
 function standUp() {
   if (player.mode !== 'sit') return
-  const info = seatInfo(player.benchIndex, 1)
-  player.position.set(info.front.x, 0, info.front.z)
+  const s = player.seat
+  // 벤치·의자는 앞자리로 일어서고, 잔디는 그 자리에서 일어남
+  if (s && s.yaw !== null) player.position.set(s.front.x, 0, s.front.z)
   player.mode = 'idle'
   player.pose = 'stand'
+  player.seat = null
+}
+
+/** 잔디밭에서 가장 가까운 앉을 곳 (안에 있으면 지금 자리) */
+function lawnSeat(): Seat | null {
+  const lawn = world.lawn
+  if (!lawn) return null
+  const p = player.position
+  const u = Math.hypot(p.x / lawn.rx, p.z / lawn.rz)
+  const k = u < 0.92 ? 1 : 0.85 / u
+  const x = p.x * k
+  const z = p.z * k
+  return { x, z, yaw: null, front: { x, z }, lift: GROUND_SIT_LIFT }
 }
 
 /**
@@ -200,31 +218,34 @@ export function toggleRun() {
   emitUi()
 }
 
-/** 앉기(가장 가까운 벤치로 걸어가서 앉음) ↔ 일어나기 */
+/** 앉기(가장 가까운 벤치·의자·잔디로 걸어가서 앉음) ↔ 일어나기 */
 export function toggleSit() {
   player.interact = null
   player.bowTime = 0
-  if (player.mode === 'sit' || player.mode === 'toBench') {
+  if (player.mode === 'sit' || player.mode === 'toSeat') {
     if (player.mode === 'sit') standUp()
     else player.mode = 'idle'
     player.target = null
+    player.seat = null
     emitUi()
     return
   }
-  let best = 0
+  const candidates: Seat[] = [...(world.seats ?? [])]
+  const lawn = lawnSeat()
+  if (lawn) candidates.push(lawn)
+  if (candidates.length === 0) return
+  let best = candidates[0]
   let bestD = Infinity
-  BENCHES.forEach((_, i) => {
-    const f = seatInfo(i, 1).front
-    const d = Math.hypot(f.x - player.position.x, f.z - player.position.z)
+  for (const c of candidates) {
+    const d = Math.hypot(c.front.x - player.position.x, c.front.z - player.position.z)
     if (d < bestD) {
       bestD = d
-      best = i
+      best = c
     }
-  })
-  const f = seatInfo(best, 1).front
-  player.benchIndex = best
-  player.target = new THREE.Vector3(f.x, 0, f.z)
-  player.mode = 'toBench'
+  }
+  player.seat = best
+  player.target = new THREE.Vector3(best.front.x, 0, best.front.z)
+  player.mode = 'toSeat'
   player.skyLook = false
   player.stuckTime = 0
   emitUi()
@@ -235,7 +256,7 @@ export function toggleSky() {
   if (player.skyLook) {
     player.skyLook = false
   } else {
-    if (player.mode === 'walk' || player.mode === 'run' || player.mode === 'toBench') {
+    if (player.mode === 'walk' || player.mode === 'run' || player.mode === 'toSeat') {
       player.mode = 'idle'
       player.target = null
       player.interact = null
@@ -255,11 +276,14 @@ export function updatePlayer(rawDt: number) {
 
   if (player.mode === 'sit') {
     // 좌석으로 살짝 미끄러지듯 자리 잡기
-    const info = seatInfo(player.benchIndex, 1)
-    const k = 1 - Math.exp(-8 * dt)
-    p.x += (info.seat.x - p.x) * k
-    p.z += (info.seat.z - p.z) * k
-    player.yaw = lerpAngle(player.yaw, info.yaw, k)
+    const s = player.seat
+    if (s) {
+      const k = 1 - Math.exp(-8 * dt)
+      p.x += (s.x - p.x) * k
+      p.z += (s.z - p.z) * k
+      if (s.yaw !== null) player.yaw = lerpAngle(player.yaw, s.yaw, k)
+      player.sitLift = s.lift
+    }
     player.pose = 'sit'
     return
   }
@@ -302,7 +326,8 @@ export function updatePlayer(rawDt: number) {
   const moved = Math.hypot(mx, mz)
   if (moved > 0.0005) {
     player.yaw = lerpAngle(player.yaw, Math.atan2(mx, mz), 1 - Math.exp(-TURN_SPEED * dt))
-    addDistance(moved)
+    // 바퀴 수는 운동장에서만 셈
+    if (world.countLaps) addDistance(moved)
   }
   player.pose = player.mode === 'run' ? 'run' : 'walk'
 
@@ -320,7 +345,7 @@ export function updatePlayer(rawDt: number) {
     if (moved < step * 0.2) {
       player.stuckTime += dt
       if (player.stuckTime > 0.4) {
-        if (player.mode === 'toBench' || player.interact) arrive()
+        if (player.mode === 'toSeat' || player.interact) arrive()
         else stop()
       }
     } else {
@@ -338,7 +363,7 @@ function arrive() {
     it.onArrive()
     return
   }
-  if (player.mode === 'toBench') {
+  if (player.mode === 'toSeat') {
     player.mode = 'sit'
     player.pose = 'sit'
   } else {

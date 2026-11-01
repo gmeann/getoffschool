@@ -23,9 +23,9 @@ export function Character({ name, bubble, labelLayer }: Props) {
     if (!root.current) return
     root.current.position.copy(player.position)
     root.current.rotation.y = player.yaw
-    animateBody(refs, anim.current, player.pose, dt)
+    animateBody(refs, anim.current, player.pose, dt, 1, player.sitLift)
     // 앉으면 머리가 올라가니 이름표도 같이 올림
-    if (tag.current) tag.current.position.y = 1.72 + anim.current.sit * 0.24
+    if (tag.current) tag.current.position.y = 1.72 + anim.current.sit * player.sitLift
   })
 
   return (

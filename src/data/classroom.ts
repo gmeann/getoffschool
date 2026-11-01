@@ -1,5 +1,5 @@
 /** 교실 배치 데이터. 방은 x -9~9, z -7~7 (교무실과 같은 크기), 칠판은 앞쪽(z = -7) 벽 */
-import type { Box, Circle, World } from './world'
+import type { Box, Circle, Seat, World } from './world'
 
 export const CLASS_ROOM = { minX: -9, maxX: 9, minZ: -7, maxZ: 7, height: 3.2 }
 
@@ -43,6 +43,17 @@ export const CLASS_BOXES: Box[] = [
 ]
 export const CLASS_CIRCLES: Circle[] = CLASS_PLANTS.map((p) => ({ ...p, r: 0.38 }))
 
+/**
+ * 앉을 수 있는 의자: 학생 의자 16개(양쪽 통로 어느 쪽에서든 다가감) + 내 업무 의자.
+ * 학생 의자는 칠판(-z)을 바라봄.
+ */
+export const CLASS_SEATS: Seat[] = [
+  ...STUDENT_DESKS.flatMap((d) =>
+    [-1, 1].map((side) => ({ x: d.x, z: d.z + 0.5, yaw: Math.PI, front: { x: d.x + side * 0.82, z: d.z + 0.5 }, lift: 0.17 })),
+  ),
+  { x: MY_DESK.x, z: MY_DESK.z - 0.62, yaw: 0, front: { x: MY_DESK.x - 1.25, z: MY_DESK.z - 0.62 }, lift: 0.23 },
+]
+
 export const CLASSROOM_WORLD: World = {
   circles: CLASS_CIRCLES,
   boxes: CLASS_BOXES,
@@ -53,4 +64,5 @@ export const CLASSROOM_WORLD: World = {
     minZ: CLASS_ROOM.minZ + 0.3,
     maxZ: CLASS_ROOM.maxZ - 0.3,
   },
+  seats: CLASS_SEATS,
 }
