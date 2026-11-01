@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { player } from '../hooks/playerStore'
-import { CharacterModel, animateBody, newAnim, useBodyRefs } from './CharacterModel'
+import { CharacterModel, PLAYER_LOOK, animateBody, newAnim, useBodyRefs } from './CharacterModel'
 
 type Props = {
   name: string
@@ -30,7 +30,7 @@ export function Character({ name, bubble, labelLayer }: Props) {
 
   return (
     <group ref={root}>
-      <CharacterModel refs={refs} />
+      <CharacterModel refs={refs} look={PLAYER_LOOK} />
       {/* 이름표 + 말풍선 (HTML 오버레이) */}
       <group ref={tag} position-y={1.72}>
       <Html portal={labelLayer} center zIndexRange={[10, 0]} style={{ pointerEvents: 'none' }}>

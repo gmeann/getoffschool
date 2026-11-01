@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { useMemo } from 'react'
 import type { ThreeEvent } from '@react-three/fiber'
+import { useDispose } from '../hooks/useDispose'
 import { TRACK } from '../data/world'
 
 type Props = { onGroundClick: (point: THREE.Vector3) => void; ground: THREE.Color; field: THREE.Color }
@@ -29,6 +30,8 @@ export function Ground({ onGroundClick, ground, field }: Props) {
     shape.holes.push(hole)
     return new THREE.ShapeGeometry(shape, 48)
   }, [])
+
+  useDispose(trackGeometry, lineGeometry)
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation()

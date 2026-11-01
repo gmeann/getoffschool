@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { useEffect, useMemo } from 'react'
 import type { Sky as SkyColors } from '../hooks/useTimeOfDay'
+import { useDispose } from '../hooks/useDispose'
 
 /** 위 → 가운데 → 아래 3색 그라데이션 하늘 (큰 구 + 간단한 셰이더). 색은 시간대에 따라 바뀜 */
 export function Sky({ sky }: { sky: SkyColors }) {
@@ -38,6 +39,8 @@ export function Sky({ sky }: { sky: SkyColors }) {
       }),
     [],
   )
+
+  useDispose(material)
 
   useEffect(() => {
     material.uniforms.top.value.copy(sky.skyTop)

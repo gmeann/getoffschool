@@ -1,14 +1,14 @@
 import * as THREE from 'three'
 import {
   BENCHES,
-  OBSTACLES,
   PLAYER_START,
-  WORLD_RADIUS,
+  PLAYGROUND_WORLD,
   laneAngleOf,
   lanePoint,
   seatInfo,
-  type Circle,
+  type World,
 } from '../data/world'
+import type { Spawn } from '../data/scenes'
 import { addDistance } from './lapStore'
 
 /**
@@ -18,9 +18,9 @@ import { addDistance } from './lapStore'
  */
 
 export type Mode = 'idle' | 'walk' | 'run' | 'toBench' | 'sit'
-export type Pose = 'stand' | 'walk' | 'run' | 'sit'
+export type Pose = 'stand' | 'walk' | 'run' | 'sit' | 'bow'
 
-const WALK_SPEED = 2.8
+const WALK_SPEED = 2.2
 const RUN_SPEED = 5.2
 const TURN_SPEED = 10
 export const PLAYER_RADIUS = 0.35
@@ -37,6 +37,31 @@ export const player = {
   benchIndex: -1,
   skyLook: false,
   stuckTime: 0,
+  /** 인사(고개 숙이기) 남은 시간 */
+  bowTime: 0,
+  /** 걸어가서 도착하면 실행할 일 (문 열기, NPC 대화 등) */
+  interact: null as Interact | null,
+}
+
+export type Interact = { x: number; z: number; radius: number; onArrive: () => void }
+
+/** 지금 장면의 충돌 정보 (장면이 바뀔 때 setWorld 로 교체) */
+let world: World = PLAYGROUND_WORLD
+export function setWorld(w: World) {
+  world = w
+}
+
+/** 장면을 옮길 때 위치와 상태를 초기화 */
+export function resetForScene(spawn: Spawn) {
+  player.position.set(spawn.x, 0, spawn.z)
+  player.yaw = spawn.yaw
+  player.target = null
+  player.mode = 'idle'
+  player.pose = 'stand'
+  player.skyLook = false
+  player.bowTime = 0
+  player.interact = null
+  emitUi()
 }
 
 // ---------- UI 구독 ----------
@@ -61,11 +86,12 @@ export function getPlayerUi() {
 }
 
 // ---------- 충돌 ----------
-export function resolveCollisions(p: { x: number; z: number }, obstacles: Circle[] = OBSTACLES, extra = 0) {
-  for (const o of obstacles) {
+export function resolveCollisions(p: { x: number; z: number }, extra = 0) {
+  const R = PLAYER_RADIUS + extra
+  for (const o of world.circles) {
     const dx = p.x - o.x
     const dz = p.z - o.z
-    const min = o.r + PLAYER_RADIUS + extra
+    const min = o.r + R
     const d2 = dx * dx + dz * dz
     if (d2 < min * min) {
       const d = Math.sqrt(d2) || 0.0001
@@ -73,11 +99,35 @@ export function resolveCollisions(p: { x: number; z: number }, obstacles: Circle
       p.z = o.z + (dz / d) * min
     }
   }
-  const len = Math.hypot(p.x, p.z)
-  const max = WORLD_RADIUS - PLAYER_RADIUS
-  if (len > max) {
-    p.x = (p.x / len) * max
-    p.z = (p.z / len) * max
+  for (const b of world.boxes) {
+    // 캐릭터 반지름만큼 넓힌 사각형 안이면 가장 가까운 변 밖으로 밀어냄
+    const minX = b.minX - R
+    const maxX = b.maxX + R
+    const minZ = b.minZ - R
+    const maxZ = b.maxZ + R
+    if (p.x > minX && p.x < maxX && p.z > minZ && p.z < maxZ) {
+      const dl = p.x - minX
+      const dr = maxX - p.x
+      const dn = p.z - minZ
+      const ds = maxZ - p.z
+      const m = Math.min(dl, dr, dn, ds)
+      if (m === dl) p.x = minX
+      else if (m === dr) p.x = maxX
+      else if (m === dn) p.z = minZ
+      else p.z = maxZ
+    }
+  }
+  const bd = world.bounds
+  if (bd.kind === 'circle') {
+    const len = Math.hypot(p.x, p.z)
+    const max = bd.r - PLAYER_RADIUS
+    if (len > max) {
+      p.x = (p.x / len) * max
+      p.z = (p.z / len) * max
+    }
+  } else {
+    p.x = Math.min(Math.max(p.x, bd.minX + PLAYER_RADIUS), bd.maxX - PLAYER_RADIUS)
+    p.z = Math.min(Math.max(p.z, bd.minZ + PLAYER_RADIUS), bd.maxZ - PLAYER_RADIUS)
   }
 }
 
@@ -96,21 +146,48 @@ function standUp() {
   player.pose = 'stand'
 }
 
-/** 바닥 클릭: 그 지점으로 걸어감 (달리기·앉기·하늘 보기는 풀림) */
-export function walkTo(point: THREE.Vector3) {
+/**
+ * 바닥 클릭: 그 지점으로 걸어감 (달리기·앉기·하늘 보기는 풀림).
+ * interact 를 주면 그 지점 반경 안에 들어왔을 때 onArrive 를 실행 (이미 가까우면 바로 실행).
+ */
+export function walkTo(point: { x: number; z: number }, interact?: Interact) {
   standUp()
+  player.bowTime = 0
+  player.skyLook = false
+  player.interact = interact ?? null
+  if (interact && Math.hypot(player.position.x - interact.x, player.position.z - interact.z) < interact.radius) {
+    player.interact = null
+    player.target = null
+    player.mode = 'idle'
+    emitUi()
+    interact.onArrive()
+    return new THREE.Vector3(player.position.x, 0, player.position.z)
+  }
   const t = new THREE.Vector3(point.x, 0, point.z)
-  resolveCollisions(t, OBSTACLES, 0.05)
+  resolveCollisions(t, 0.05)
   player.target = t
   player.mode = 'walk'
-  player.skyLook = false
   player.stuckTime = 0
   emitUi()
   return t
 }
 
+/** 인사하기: 대상 쪽을 보고 고개를 숙임 */
+export function bow(toward?: { x: number; z: number }) {
+  standUp()
+  player.mode = 'idle'
+  player.target = null
+  player.interact = null
+  player.skyLook = false
+  if (toward) player.yaw = Math.atan2(toward.x - player.position.x, toward.z - player.position.z)
+  player.bowTime = 1.4
+  emitUi()
+}
+
 /** 뛰기 ↔ 멈추기 */
 export function toggleRun() {
+  player.interact = null
+  player.bowTime = 0
   if (player.mode === 'run') {
     player.mode = 'idle'
     player.target = null
@@ -125,6 +202,8 @@ export function toggleRun() {
 
 /** 앉기(가장 가까운 벤치로 걸어가서 앉음) ↔ 일어나기 */
 export function toggleSit() {
+  player.interact = null
+  player.bowTime = 0
   if (player.mode === 'sit' || player.mode === 'toBench') {
     if (player.mode === 'sit') standUp()
     else player.mode = 'idle'
@@ -159,6 +238,7 @@ export function toggleSky() {
     if (player.mode === 'walk' || player.mode === 'run' || player.mode === 'toBench') {
       player.mode = 'idle'
       player.target = null
+      player.interact = null
     }
     player.skyLook = true
   }
@@ -169,7 +249,8 @@ export function toggleSky() {
 const runTarget = new THREE.Vector3()
 
 export function updatePlayer(rawDt: number) {
-  const dt = Math.min(rawDt, 0.05)
+  // 느린 기기에서도 이동 속도가 크게 줄지 않도록 한 프레임 최대 0.1초까지 반영
+  const dt = Math.min(rawDt, 0.1)
   const p = player.position
 
   if (player.mode === 'sit') {
@@ -193,7 +274,12 @@ export function updatePlayer(rawDt: number) {
   }
 
   if (!target || player.mode === 'idle') {
-    player.pose = 'stand'
+    if (player.bowTime > 0) {
+      player.bowTime -= dt
+      player.pose = 'bow'
+    } else {
+      player.pose = 'stand'
+    }
     return
   }
 
@@ -220,12 +306,21 @@ export function updatePlayer(rawDt: number) {
   }
   player.pose = player.mode === 'run' ? 'run' : 'walk'
 
+  // 문·NPC 같은 목적지 반경 안에 들어오면 멈추고 실행
+  const it = player.interact
+  if (it && Math.hypot(p.x - it.x, p.z - it.z) < it.radius) {
+    player.interact = null
+    stop()
+    it.onArrive()
+    return
+  }
+
   // 걷다가 장애물에 막혀 거의 못 움직이면 멈춤
   if (player.mode !== 'run') {
     if (moved < step * 0.2) {
       player.stuckTime += dt
       if (player.stuckTime > 0.4) {
-        if (player.mode === 'toBench') arrive()
+        if (player.mode === 'toBench' || player.interact) arrive()
         else stop()
       }
     } else {
@@ -235,6 +330,14 @@ export function updatePlayer(rawDt: number) {
 }
 
 function arrive() {
+  // 막혀서 멈췄더라도 목적지 근처면 상호작용 실행
+  const it = player.interact
+  player.interact = null
+  if (it && Math.hypot(player.position.x - it.x, player.position.z - it.z) < it.radius * 1.8) {
+    stop()
+    it.onArrive()
+    return
+  }
   if (player.mode === 'toBench') {
     player.mode = 'sit'
     player.pose = 'sit'

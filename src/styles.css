@@ -135,10 +135,11 @@ button.pill:active { transform: scale(0.94); }
   white-space: nowrap;
 }
 .nametag-me { color: var(--accent); font-weight: 700; }
-/* 그림자 선생님 이름표/말풍선: 흐릿한 흰빛 */
-.nametag.ghost { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.22); color: rgba(255, 255, 255, 0.78); font-size: 10.5px; padding: 2px 8px; }
-.speech.ghost { background: rgba(255, 255, 255, 0.88); color: #4a4560; font-weight: 500; }
-.speech.ghost::after { border-top-color: rgba(255, 255, 255, 0.88); }
+/* 다른 선생님 이름표/말풍선: 조금 작고 부드럽게 */
+.nametag.other { background: rgba(43, 37, 64, 0.38); border-color: rgba(255, 255, 255, 0.2); color: rgba(255, 255, 255, 0.88); font-size: 10.5px; padding: 2px 8px; }
+.speech.other { font-weight: 500; color: #4a4560; }
+/* NPC 직책 이름표 */
+.nametag.npc { background: rgba(255, 247, 238, 0.92); color: #3a2f52; border-color: rgba(255, 255, 255, 0.7); font-weight: 700; }
 .speech {
   position: relative;
   padding: 7px 13px;
@@ -188,3 +189,226 @@ button.pill:active { transform: scale(0.94); }
   animation: breathe 1.2s ease-in-out infinite;
 }
 @keyframes breathe { 50% { transform: scale(1.6); opacity: 0.5; } }
+
+/* ---------- 3단계: 공간 이동 ---------- */
+.fade {
+  position: absolute;
+  inset: 0;
+  z-index: 45;
+  background: #1c1628;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.45s ease;
+}
+.fade.on { opacity: 1; pointer-events: auto; }
+
+.scene-menu-wrap { position: relative; }
+.pill.title { cursor: pointer; }
+.pill.title .caret { font-size: 11px; opacity: 0.7; transition: transform 0.2s; }
+.pill.title.open .caret { transform: rotate(180deg); }
+.scene-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 190px;
+  padding: 6px;
+  border-radius: 18px;
+  background: rgba(43, 37, 64, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--pill-border);
+  box-shadow: 0 10px 30px rgba(20, 12, 40, 0.3);
+  pointer-events: auto;
+  animation: pop 0.15s ease-out;
+}
+.scene-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+.scene-item:hover { background: rgba(255, 255, 255, 0.1); }
+.scene-item.current { background: rgba(247, 183, 119, 0.22); }
+.scene-item.soon { opacity: 0.42; cursor: not-allowed; }
+.scene-item .tag { font-size: 11px; font-weight: 500; opacity: 0.85; }
+
+.door-sign {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: #fff7ee;
+  color: #3a2f52;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 3px 10px rgba(20, 12, 40, 0.25);
+}
+.door-sign.soon { background: rgba(255, 247, 238, 0.6); color: rgba(58, 47, 82, 0.7); }
+.door-sign span { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 999px; background: rgba(58, 47, 82, 0.12); }
+
+/* ---------- 대화창 ---------- */
+.dialog-sheet {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 14px);
+  z-index: 30;
+  width: min(560px, calc(100% - 24px));
+  transform: translateX(-50%);
+  padding: 16px 18px 14px;
+  border-radius: 22px;
+  background: rgba(255, 249, 241, 0.97);
+  color: #3a2f52;
+  box-shadow: 0 14px 40px rgba(20, 12, 40, 0.35);
+  animation: sheet-up 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+}
+@keyframes sheet-up {
+  from { transform: translate(-50%, 40px); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}
+.dialog-head { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.dialog-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid rgba(58, 47, 82, 0.2); }
+.dialog-x {
+  margin-left: auto;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(58, 47, 82, 0.08);
+  color: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.dialog-text { margin: 10px 2px 12px; font-size: 16px; line-height: 1.55; font-weight: 500; word-break: keep-all; }
+.dialog-buttons { display: flex; gap: 8px; }
+.dialog-btn {
+  flex: 1;
+  height: 46px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(58, 47, 82, 0.08);
+  color: #3a2f52;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.dialog-btn.primary { flex: 1.4; background: #f2a65a; color: #fff; }
+.dialog-btn:disabled { background: rgba(58, 47, 82, 0.1); color: rgba(58, 47, 82, 0.4); cursor: not-allowed; }
+.dialog-btn:not(:disabled):active { transform: scale(0.97); }
+
+.gift-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: #fff;
+  border: 2px solid #f1e4d4;
+  animation: pop 0.25s ease-out;
+}
+.gift-card.special { border-color: #a5c8ff; }
+.gift-card.rare { border-color: #f5c84c; box-shadow: 0 0 0 3px rgba(245, 200, 76, 0.25); }
+.gift-name { font-weight: 700; font-size: 15px; }
+.gift-desc { font-size: 13px; opacity: 0.75; margin-top: 2px; word-break: keep-all; }
+
+.rarity { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; vertical-align: 1px; }
+.rarity.common { background: #efe7dc; color: #7a6a58; }
+.rarity.special { background: #dce9ff; color: #3a62b0; }
+.rarity.rare { background: #ffefc2; color: #a06c00; }
+
+.snack-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border-radius: 40%;
+  line-height: 1;
+}
+.snack-icon.shape { color: rgba(255, 255, 255, 0.92); font-weight: 800; box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.12); }
+.snack-icon.locked { background: #d9d3e3; color: #8d84a0; font-weight: 800; filter: grayscale(1); }
+
+.snack-float {
+  position: absolute;
+  left: 50%;
+  bottom: 190px;
+  z-index: 35;
+  pointer-events: none;
+  animation: float-up 1.3s ease-out forwards;
+}
+@keyframes float-up {
+  0% { transform: translate(-50%, 20px) scale(0.6); opacity: 0; }
+  20% { transform: translate(-50%, 0) scale(1.15); opacity: 1; }
+  100% { transform: translate(-50%, -150px) scale(0.9); opacity: 0; }
+}
+
+/* ---------- 도감 ---------- */
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 38;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(20, 14, 32, 0.45);
+  animation: pop 0.15s ease-out;
+}
+.snack-book {
+  width: min(560px, 100%);
+  max-height: calc(100% - 20px);
+  overflow: auto;
+  padding: 18px;
+  border-radius: 24px;
+  background: #fff9f1;
+  color: #3a2f52;
+  box-shadow: 0 20px 50px rgba(20, 12, 40, 0.4);
+}
+.book-head { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 12px; }
+.book-head h2 { margin: 0; font-size: 19px; }
+.book-head p { margin: 4px 0 0; font-size: 14px; opacity: 0.8; }
+.book-head p strong { color: #e08a3a; font-size: 16px; }
+.book-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.book-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 4px 8px;
+  border: 2px solid #f1e4d4;
+  border-radius: 16px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.book-cell.special { border-color: #c6dbff; }
+.book-cell.rare { border-color: #f5d27a; background: #fffaf0; }
+.book-cell.locked { background: #f4f0f7; border-style: dashed; border-color: #ddd5e6; cursor: default; }
+.book-cell.selected { outline: 3px solid #f2a65a; outline-offset: 1px; }
+.cell-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.book-cell.locked .cell-name { color: #a39bb2; }
+.cell-count { position: absolute; top: 4px; right: 6px; font-size: 11px; font-weight: 700; color: #e08a3a; }
+.book-detail { margin-top: 12px; padding: 10px 12px; border-radius: 14px; background: rgba(58, 47, 82, 0.06); font-size: 14px; line-height: 1.5; min-height: 46px; word-break: keep-all; }
+.detail-desc { display: block; margin-top: 2px; opacity: 0.8; }
+.detail-hint { opacity: 0.65; font-size: 13px; }
+
+@media (max-width: 480px) {
+  .book-grid { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .dialog-text { font-size: 15px; }
+  .scene-menu { min-width: 170px; }
+}

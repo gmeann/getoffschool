@@ -1,4 +1,5 @@
 import { LAP_LENGTH } from '../data/world'
+import { storageGet, storageSet, todayKey } from './clock'
 
 /**
  * 걸음 거리 → 바퀴 수. localStorage 에 날짜별로 저장.
@@ -6,28 +7,8 @@ import { LAP_LENGTH } from '../data/world'
  */
 
 export const TITLE_10_LAPS = '운동장 10바퀴'
-const PREFIX = 'getoffschool:'
-
-function todayKey() {
-  const d = new Date()
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
-}
-
-function read(key: string): string | null {
-  try {
-    return localStorage.getItem(PREFIX + key)
-  } catch {
-    return null
-  }
-}
-function write(key: string, value: string) {
-  try {
-    localStorage.setItem(PREFIX + key, value)
-  } catch {
-    /* 사생활 보호 모드 등에서는 저장 없이 진행 */
-  }
-}
+const read = storageGet
+const write = storageSet
 
 let day = todayKey()
 let meters = Number(read(`meters:${day}`)) || 0

@@ -1,6 +1,14 @@
 /** 운동장 배치 데이터. 위치 단위는 m, 바닥은 y = 0 평면. */
 
 export type Circle = { x: number; z: number; r: number }
+/** 축에 나란한 사각형 충돌 영역 */
+export type Box = { minX: number; maxX: number; minZ: number; maxZ: number }
+/** 장면마다 다른 충돌 정보 */
+export type World = {
+  circles: Circle[]
+  boxes: Box[]
+  bounds: { kind: 'circle'; r: number } | ({ kind: 'rect' } & Box)
+}
 
 /** 캐릭터가 걸어 다닐 수 있는 원형 경계 */
 export const WORLD_RADIUS = 34
@@ -45,8 +53,8 @@ export const TREES: { x: number; z: number; s: number }[] = [
   { x: -19, z: 11, s: 1.0 },
   { x: 21, z: -8, s: 1.2 },
   { x: 23, z: 2, s: 0.85 },
-  { x: 7, z: -15, s: 1.0 },
-  { x: -10, z: -17, s: 1.15 },
+  { x: 11, z: -14.5, s: 1.0 },
+  { x: -15, z: -15, s: 1.15 },
   { x: 14, z: 14, s: 0.95 },
 ]
 
@@ -92,6 +100,22 @@ export const OBSTACLES: Circle[] = [
   // 벤치 하나를 원 두 개로 덮음
   ...BENCHES.flatMap((b) => [-0.55, 0.55].map((lx) => ({ ...benchLocalToWorld(b, lx, -0.05), r: 0.6 }))),
 ]
+
+/** 학교 건물 외관 (운동장 북쪽). 정면은 z = BUILDING.z + d/2 */
+export const BUILDING = { x: 0, z: -22.5, w: 22, d: 6, h: 6 }
+
+export const BUILDING_BOX: Box = {
+  minX: BUILDING.x - BUILDING.w / 2,
+  maxX: BUILDING.x + BUILDING.w / 2,
+  minZ: BUILDING.z - BUILDING.d / 2,
+  maxZ: BUILDING.z + BUILDING.d / 2,
+}
+
+export const PLAYGROUND_WORLD: World = {
+  circles: OBSTACLES,
+  boxes: [BUILDING_BOX],
+  bounds: { kind: 'circle', r: WORLD_RADIUS },
+}
 
 /** 우상단 "오늘 N명" (지금은 임의의 고정 숫자) */
 export const TODAY_VISITORS = 27

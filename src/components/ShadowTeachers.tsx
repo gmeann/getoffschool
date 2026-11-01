@@ -6,7 +6,7 @@ import { NICKNAMES } from '../data/nicknames'
 import { pickShadowLine } from '../data/shadowLines'
 import { BENCHES, LANE, TALK_DISTANCE, laneSpeedFactor, lanePoint, seatInfo } from '../data/world'
 import { player } from '../hooks/playerStore'
-import { CharacterModel, animateBody, newAnim, useBodyRefs } from './CharacterModel'
+import { CharacterModel, animateBody, newAnim, useBodyRefs, type Look } from './CharacterModel'
 
 type Spec = {
   name: string
@@ -15,7 +15,16 @@ type Spec = {
   theta: number // 트랙 위 시작 각도
   offset: number // 레인 안쪽/바깥쪽 치우침
   bench: number
+  look: Look
 }
+
+/** 산책하는 선생님 옷차림: 차분한 파스텔 카디건 + 다양한 머리색 (불투명, 형태가 또렷하게) */
+const TOPS = ['#9fd3c7', '#b8a9e3', '#f4a6a6', '#a7c7e7', '#f6d186', '#c7d9a7', '#e8b4d0', '#d9c2a6']
+const PANTS = ['#4d4a6b', '#5a5f73', '#6b5b4f', '#3f4a5c']
+const HAIRS = ['#3b2a2a', '#5a3d2b', '#2a2a35', '#7a5a45', '#4a3a3a']
+const SHOES = ['#e9e4da', '#c9d7e8', '#f0d3c0', '#cfe3d0']
+const SKINS = ['#f6c7a1', '#f1bf96', '#f8d0b0']
+const pick = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)]
 
 const BUBBLE_SECONDS = 3
 const COOLDOWN_SECONDS = 10
@@ -37,16 +46,21 @@ function makeSpecs(myName: string): Spec[] {
     return {
       name: names[i % names.length],
       kind: sit ? 'sit' : run ? 'run' : 'walk',
-      speed: run ? rand(3.2, 4.6) : rand(0.9, 1.7),
+      // 설렁설렁 걷기 (0.45~0.8 m/s), 뛰는 사람은 가볍게 조깅
+      speed: run ? rand(2.4, 3.3) : rand(0.45, 0.8),
       // 트랙 위에 고르게 흩어 놓고 조금씩 흔듦 (처음부터 뭉치지 않게)
       theta: (i / count) * Math.PI * 2 + rand(-0.3, 0.3),
       offset: rand(-0.7, 0.7),
       bench: sit ? benchOrder[i] : -1,
+      look: (() => {
+        const top = TOPS[i % TOPS.length]
+        return { top, sleeves: top, inner: '#fffaf2', pants: pick(PANTS), shoes: pick(SHOES), hair: pick(HAIRS), skin: pick(SKINS) }
+      })(),
     }
   })
 }
 
-function ShadowTeacher({ spec, material, labelLayer }: { spec: Spec; material: THREE.Material; labelLayer: RefObject<HTMLDivElement> }) {
+function ShadowTeacher({ spec, labelLayer }: { spec: Spec; labelLayer: RefObject<HTMLDivElement> }) {
   const root = useRef<THREE.Group>(null)
   const tag = useRef<THREE.Group>(null)
   const refs = useBodyRefs()
@@ -75,7 +89,9 @@ function ShadowTeacher({ spec, material, labelLayer }: { spec: Spec; material: T
       const a = LANE.rx + spec.offset
       const b = LANE.rz + spec.offset
       g.rotation.y = Math.atan2(-a * Math.sin(t), b * Math.cos(t))
-      animateBody(refs, anim.current, spec.kind, dt)
+      // 걸음 빠르기를 실제 속도에 맞춰 느긋하게
+      const stride = spec.kind === 'run' ? spec.speed / 5.2 : Math.max(0.45, spec.speed / 2.2)
+      animateBody(refs, anim.current, spec.kind, dt, stride)
     }
     if (tag.current) tag.current.position.y = 1.62 + anim.current.sit * 0.24
 
@@ -101,12 +117,12 @@ function ShadowTeacher({ spec, material, labelLayer }: { spec: Spec; material: T
 
   return (
     <group ref={root}>
-      <CharacterModel refs={refs} ghost={material} />
+      <CharacterModel refs={refs} look={spec.look} />
       <group ref={tag} position-y={1.62}>
         <Html portal={labelLayer} center zIndexRange={[9, 0]} style={{ pointerEvents: 'none' }}>
           <div className="tag-stack">
-            {line && <div className="speech ghost">{line}</div>}
-            <div className="nametag ghost">{spec.name}</div>
+            {line && <div className="speech other">{line}</div>}
+            <div className="nametag other">{spec.name}</div>
           </div>
         </Html>
       </group>
@@ -114,25 +130,13 @@ function ShadowTeacher({ spec, material, labelLayer }: { spec: Spec; material: T
   )
 }
 
-/** 그림자 선생님들: 반투명한 흰빛 재질 하나를 모두 함께 씀 */
+/** 운동장을 산책하는 선생님들 (코드 이름은 ShadowTeachers 로 유지) */
 export function ShadowTeachers({ myName, labelLayer }: { myName: string; labelLayer: RefObject<HTMLDivElement> }) {
   const specs = useMemo(() => makeSpecs(myName), [myName])
-  const material = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        color: '#ffffff',
-        emissive: '#dfe6ff',
-        emissiveIntensity: 0.45,
-        roughness: 1,
-        transparent: true,
-        opacity: 0.45,
-      }),
-    [],
-  )
   return (
     <>
       {specs.map((s, i) => (
-        <ShadowTeacher key={i} spec={s} material={material} labelLayer={labelLayer} />
+        <ShadowTeacher key={i} spec={s} labelLayer={labelLayer} />
       ))}
     </>
   )

@@ -1,26 +1,61 @@
 import { Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Playground } from './scenes/Playground'
+import { Office } from './scenes/Office'
 import { Hud, type HudAction } from './components/Hud'
+import { DialogSheet } from './components/DialogSheet'
+import { SnackBook } from './components/SnackBook'
+import { SnackIcon } from './components/SnackIcon'
 import { pickRandomNickname } from './data/nicknames'
-import { getPlayerUi, subscribePlayer, toggleRun, toggleSit, toggleSky } from './hooks/playerStore'
+import { SCENES, doorFront, type Door, type SceneId } from './data/scenes'
+import { ALREADY_LINES, NPCS, NPC_BY_ID, pickFrom, pickNpcLine, type NpcDef, type NpcId } from './data/npcs'
+import type { Snack } from './data/snacks'
+import {
+  bow,
+  getPlayerUi,
+  player,
+  resetForScene,
+  subscribePlayer,
+  toggleRun,
+  toggleSit,
+  toggleSky,
+  walkTo,
+} from './hooks/playerStore'
 import { getLapUi, onLapEvent, subscribeLaps } from './hooks/lapStore'
+import { getSnackUi, receiveSnack, receivedToday, subscribeSnacks } from './hooks/snackStore'
 
 const SOON = '준비 중이에요'
+const FADE_MS = 450
+/** 이만큼 멀어지면 대화창이 저절로 닫힘 */
+const DIALOG_KEEP_DISTANCE = 3.6
+/** 인사하기가 닿는 거리 */
+const GREET_DISTANCE = 4
+
+type Dialog = { npc: NpcDef; text: string; gift: Snack | null }
 
 export default function App() {
   // 접속할 때마다 무작위 이름 (새로고침하면 바뀜)
   const [name] = useState(pickRandomNickname)
   const [ready, setReady] = useState(false)
+  const [sceneId, setSceneId] = useState<SceneId>('playground')
+  const [fading, setFading] = useState(false)
   const [bubble, setBubble] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  const [dialog, setDialog] = useState<Dialog | null>(null)
+  const [bookOpen, setBookOpen] = useState(false)
+  const [floatSnack, setFloatSnack] = useState<{ snack: Snack; key: number } | null>(null)
+  const [npcBubbles, setNpcBubbles] = useState<Partial<Record<NpcId, string>>>({})
+  const [npcBows, setNpcBows] = useState<Partial<Record<NpcId, number>>>({})
   const bubbleTimer = useRef<number>(0)
   const toastTimer = useRef<number>(0)
+  const npcTimers = useRef<Partial<Record<NpcId, number>>>({})
+  const transitioning = useRef(false)
   // 이름표/말풍선(drei Html)을 붙일 고정 컨테이너. 대상이 바뀌면 Html 내용이 사라지는 문제를 피함
   const labelLayer = useRef<HTMLDivElement>(null!)
 
   const playerUi = useSyncExternalStore(subscribePlayer, getPlayerUi)
   const lapUi = useSyncExternalStore(subscribeLaps, getLapUi)
+  const snackUi = useSyncExternalStore(subscribeSnacks, getSnackUi)
 
   const showBubble = useCallback((text: string, ms = 1800) => {
     setBubble(text)
@@ -34,6 +69,12 @@ export default function App() {
     toastTimer.current = window.setTimeout(() => setToast(null), ms)
   }, [])
 
+  const showNpcBubble = useCallback((id: NpcId, text: string, ms = 2600) => {
+    setNpcBubbles((b) => ({ ...b, [id]: text }))
+    window.clearTimeout(npcTimers.current[id])
+    npcTimers.current[id] = window.setTimeout(() => setNpcBubbles((b) => ({ ...b, [id]: undefined })), ms)
+  }, [])
+
   // 한 바퀴 완주 / 칭호 획득 알림
   useEffect(
     () =>
@@ -44,6 +85,106 @@ export default function App() {
     [showBubble, showToast],
   )
 
+  // ---------- 공간 이동 (페이드) ----------
+  const goToScene = useCallback(
+    (to: SceneId) => {
+      const def = SCENES[to]
+      if (!def.ready || transitioning.current || to === sceneId) return
+      transitioning.current = true
+      setDialog(null)
+      setBookOpen(false)
+      setFading(true)
+      window.setTimeout(() => {
+        // 화면이 완전히 어두워진 뒤 장면 교체 (이전 장면은 언마운트되며 자원 정리)
+        resetForScene(def.spawnFrom?.[sceneId] ?? def.spawn)
+        setNpcBubbles({})
+        setSceneId(to)
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            setFading(false)
+            window.setTimeout(() => (transitioning.current = false), FADE_MS)
+          }),
+        )
+      }, FADE_MS)
+    },
+    [sceneId],
+  )
+
+  const handleDoor = useCallback(
+    (door: Door) => {
+      const front = doorFront(door, 1.0)
+      walkTo(front, {
+        x: door.x,
+        z: door.z,
+        radius: 1.7,
+        onArrive: () => {
+          if (SCENES[door.to].ready) goToScene(door.to)
+          else showBubble(SOON)
+        },
+      })
+    },
+    [goToScene, showBubble],
+  )
+
+  // ---------- NPC 대화 ----------
+  const openDialog = useCallback((npc: NpcDef) => {
+    const text = receivedToday(npc.id) ? pickFrom(ALREADY_LINES) : pickNpcLine(npc.id)
+    setDialog({ npc, text, gift: null })
+  }, [])
+
+  const handleNpc = useCallback(
+    (npc: NpcDef) => {
+      walkTo(npc.talkFrom, { x: npc.x, z: npc.z, radius: 2.2, onArrive: () => openDialog(npc) })
+    },
+    [openDialog],
+  )
+
+  const handleSnack = useCallback(() => {
+    if (!dialog) return
+    const snack = receiveSnack(dialog.npc.id)
+    if (!snack) {
+      setDialog({ ...dialog, text: pickFrom(ALREADY_LINES) })
+      return
+    }
+    setDialog({ ...dialog, text: dialog.npc.giveLine(snack.name), gift: snack })
+    setFloatSnack({ snack, key: Date.now() })
+    showBubble(`${snack.emoji ?? '🍪'} ${snack.name} 받았어요!`, 2200)
+  }, [dialog, showBubble])
+
+  // 멀어지면 대화창 닫기
+  useEffect(() => {
+    if (!dialog) return
+    const id = window.setInterval(() => {
+      const d = Math.hypot(player.position.x - dialog.npc.x, player.position.z - dialog.npc.z)
+      if (d > DIALOG_KEEP_DISTANCE) setDialog(null)
+    }, 250)
+    return () => window.clearInterval(id)
+  }, [dialog])
+
+  // ---------- 인사하기 ----------
+  const greet = useCallback(() => {
+    let best: NpcDef | null = null
+    let bestD = Infinity
+    for (const n of NPCS) {
+      const d = Math.hypot(player.position.x - n.x, player.position.z - n.z)
+      if (d < bestD) {
+        bestD = d
+        best = n
+      }
+    }
+    if (!best || bestD > GREET_DISTANCE) {
+      bow()
+      showBubble('가까이 가서 인사해 볼까요?')
+      return
+    }
+    const npc = best
+    bow(npc)
+    window.setTimeout(() => {
+      setNpcBows((b) => ({ ...b, [npc.id]: Date.now() }))
+      showNpcBubble(npc.id, pickFrom(npc.greetings))
+    }, 350)
+  }, [showBubble, showNpcBubble])
+
   const handleAction = useCallback(
     (action: HudAction) => {
       switch (action) {
@@ -53,14 +194,20 @@ export default function App() {
           return toggleSit()
         case 'sky':
           return toggleSky()
+        case 'book':
+          return setBookOpen(true)
+        case 'greet':
+          return greet()
         case 'sound':
           return showToast(`소리는 ${SOON}`)
         default:
           return showToast(SOON)
       }
     },
-    [showToast],
+    [showToast, greet],
   )
+
+  const sceneProps = { name, bubble, labelLayer, onDoor: handleDoor }
 
   return (
     <div className="app">
@@ -70,15 +217,54 @@ export default function App() {
         shadows={false}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
         camera={{ fov: 45, near: 0.1, far: 900, position: [0, 6, 17] }}
-        onCreated={() => requestAnimationFrame(() => setReady(true))}
+        onCreated={(state) => {
+          // 개발 중 자동 확인용 (배포 빌드에는 들어가지 않음)
+          if (import.meta.env.DEV) Object.assign(window, { __three: state })
+          requestAnimationFrame(() => setReady(true))
+        }}
       >
         <Suspense fallback={null}>
-          <Playground name={name} bubble={bubble} labelLayer={labelLayer} />
+          {/* 한 번에 한 장면만 불러옴. key 가 바뀌면 이전 장면은 통째로 정리됨 */}
+          {sceneId === 'playground' && <Playground key="playground" {...sceneProps} />}
+          {sceneId === 'office' && (
+            <Office key="office" {...sceneProps} onNpc={handleNpc} npcBubbles={npcBubbles} npcBows={npcBows} />
+          )}
         </Suspense>
       </Canvas>
       <div ref={labelLayer} className="label-layer" />
 
-      <Hud onAction={handleAction} toast={toast} player={playerUi} laps={lapUi.laps} titles={lapUi.titles} />
+      <Hud
+        sceneId={sceneId}
+        onAction={handleAction}
+        onScene={goToScene}
+        toast={toast}
+        player={playerUi}
+        laps={lapUi.laps}
+        titles={lapUi.titles}
+        hideBottom={!!dialog}
+      />
+
+      {dialog && (
+        <DialogSheet
+          key={dialog.npc.id}
+          npc={NPC_BY_ID[dialog.npc.id]}
+          text={dialog.text}
+          gift={dialog.gift}
+          received={receivedToday(dialog.npc.id, snackUi)}
+          onSnack={handleSnack}
+          onClose={() => setDialog(null)}
+        />
+      )}
+
+      {floatSnack && (
+        <div key={floatSnack.key} className="snack-float" onAnimationEnd={() => setFloatSnack(null)}>
+          <SnackIcon snack={floatSnack.snack} size={56} />
+        </div>
+      )}
+
+      {bookOpen && <SnackBook collection={snackUi.collection} onClose={() => setBookOpen(false)} />}
+
+      <div className={`fade ${fading ? 'on' : ''}`} aria-hidden />
 
       <div className={`loading ${ready ? 'done' : ''}`} aria-hidden={ready}>
         <div className="loading-dot" />

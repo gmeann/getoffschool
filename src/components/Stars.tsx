@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { player } from '../hooks/playerStore'
+import { useDispose } from '../hooks/useDispose'
 
 const COUNT = 140
 
@@ -24,6 +25,7 @@ export function Stars({ level }: { level: number }) {
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
     return g
   }, [])
+  useDispose(geometry)
   const look = useRef(0)
 
   useFrame((_, dt) => {

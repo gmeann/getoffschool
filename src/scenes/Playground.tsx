@@ -1,4 +1,4 @@
-import { useRef, type RefObject } from 'react'
+import { useLayoutEffect, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { Sky } from '../components/Sky'
@@ -12,15 +12,20 @@ import { Character } from '../components/Character'
 import { ShadowTeachers } from '../components/ShadowTeachers'
 import { CameraRig } from '../components/CameraRig'
 import { TargetRing, type TargetRingHandle } from '../components/TargetRing'
-import { updatePlayer, walkTo } from '../hooks/playerStore'
+import { setWorld, updatePlayer, walkTo } from '../hooks/playerStore'
+import { SchoolBuilding } from '../components/SchoolBuilding'
+import { PLAYGROUND_WORLD } from '../data/world'
+import type { Door } from '../data/scenes'
 import { useTimeOfDay } from '../hooks/useTimeOfDay'
 
-type Props = { name: string; bubble: string | null; labelLayer: RefObject<HTMLDivElement> }
+type Props = { name: string; bubble: string | null; labelLayer: RefObject<HTMLDivElement>; onDoor: (door: Door) => void }
 
 /** 운동장 장면 */
-export function Playground({ name, bubble, labelLayer }: Props) {
+export function Playground({ name, bubble, labelLayer, onDoor }: Props) {
   const ring = useRef<TargetRingHandle>(null)
   const sky = useTimeOfDay()
+
+  useLayoutEffect(() => setWorld(PLAYGROUND_WORLD), [])
 
   // 내 캐릭터 이동은 다른 것보다 먼저 계산 (카메라·그림자가 같은 프레임 위치를 쓰도록)
   useFrame((_, dt) => updatePlayer(dt), -1)
@@ -47,6 +52,7 @@ export function Playground({ name, bubble, labelLayer }: Props) {
       <Trees />
       <StreetLamps level={sky.lamp} />
       <Benches />
+      <SchoolBuilding onDoor={onDoor} glow={Math.min(1, sky.lamp / 2.2)} labelLayer={labelLayer} />
       <TargetRing ref={ring} />
       <ShadowTeachers myName={name} labelLayer={labelLayer} />
       <Character name={name} bubble={bubble} labelLayer={labelLayer} />
