@@ -1,8 +1,9 @@
 import * as THREE from 'three'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
+import type { Sky as SkyColors } from '../hooks/useTimeOfDay'
 
-/** 위 보라 → 가운데 분홍 → 아래 주황 그라데이션 하늘 (큰 구 + 간단한 셰이더) */
-export function SunsetSky() {
+/** 위 → 가운데 → 아래 3색 그라데이션 하늘 (큰 구 + 간단한 셰이더). 색은 시간대에 따라 바뀜 */
+export function Sky({ sky }: { sky: SkyColors }) {
   const material = useMemo(
     () =>
       new THREE.ShaderMaterial({
@@ -10,9 +11,9 @@ export function SunsetSky() {
         depthWrite: false,
         fog: false,
         uniforms: {
-          top: { value: new THREE.Color('#4b3f7a') },
-          mid: { value: new THREE.Color('#d9777f') },
-          bottom: { value: new THREE.Color('#f7b777') },
+          top: { value: new THREE.Color() },
+          mid: { value: new THREE.Color() },
+          bottom: { value: new THREE.Color() },
         },
         vertexShader: /* glsl */ `
           varying vec3 vDir;
@@ -38,8 +39,14 @@ export function SunsetSky() {
     [],
   )
 
+  useEffect(() => {
+    material.uniforms.top.value.copy(sky.skyTop)
+    material.uniforms.mid.value.copy(sky.skyMid)
+    material.uniforms.bottom.value.copy(sky.skyBottom)
+  }, [material, sky])
+
   return (
-    <mesh material={material} raycast={() => null} renderOrder={-1}>
+    <mesh material={material} renderOrder={-1}>
       <sphereGeometry args={[400, 24, 16]} />
     </mesh>
   )

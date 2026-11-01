@@ -1,48 +1,56 @@
 import { useRef, type RefObject } from 'react'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { SunsetSky } from '../components/SunsetSky'
+import { Sky } from '../components/Sky'
+import { Stars } from '../components/Stars'
 import { Ground } from '../components/Ground'
 import { Mountains } from '../components/Mountains'
 import { Trees } from '../components/Trees'
 import { StreetLamps } from '../components/StreetLamps'
-import { Bench } from '../components/Bench'
+import { Benches } from '../components/Benches'
 import { Character } from '../components/Character'
+import { ShadowTeachers } from '../components/ShadowTeachers'
 import { CameraRig } from '../components/CameraRig'
 import { TargetRing, type TargetRingHandle } from '../components/TargetRing'
-import { useClickToMove } from '../hooks/useClickToMove'
-import { PLAYER_START } from '../data/world'
+import { updatePlayer, walkTo } from '../hooks/playerStore'
+import { useTimeOfDay } from '../hooks/useTimeOfDay'
 
 type Props = { name: string; bubble: string | null; labelLayer: RefObject<HTMLDivElement> }
 
-/** 1단계 장면: 노을 진 운동장 */
+/** 운동장 장면 */
 export function Playground({ name, bubble, labelLayer }: Props) {
-  const { state, setTarget } = useClickToMove(PLAYER_START)
   const ring = useRef<TargetRingHandle>(null)
+  const sky = useTimeOfDay()
+
+  // 내 캐릭터 이동은 다른 것보다 먼저 계산 (카메라·그림자가 같은 프레임 위치를 쓰도록)
+  useFrame((_, dt) => updatePlayer(dt), -1)
 
   const handleGroundClick = (point: THREE.Vector3) => {
-    const t = setTarget(point)
+    const t = walkTo(point)
     ring.current?.show(t)
   }
 
   return (
     <>
-      <color attach="background" args={['#d9777f']} />
-      <fog attach="fog" args={['#d98a85', 40, 175]} />
+      <color attach="background" args={[sky.skyMid]} />
+      <fog attach="fog" args={[sky.fog, 40, 175]} />
 
-      {/* 조명: 따뜻한 주황 방향광 + 은은한 보라 환경광 */}
-      <hemisphereLight args={['#c9b3f0', '#6a4a6a', 1.6]} />
-      <ambientLight color="#9a86cf" intensity={0.6} />
-      <directionalLight color="#ffb070" intensity={2.6} position={[-18, 10, 14]} />
+      {/* 조명: 시간대에 따라 색과 세기가 바뀜 */}
+      <hemisphereLight args={[sky.hemiSky, sky.hemiGround, sky.hemiIntensity]} />
+      <ambientLight color={sky.ambient} intensity={sky.ambientIntensity} />
+      <directionalLight color={sky.sun} intensity={sky.sunIntensity} position={sky.sunPos} />
 
-      <SunsetSky />
+      <Sky sky={sky} />
+      <Stars level={sky.stars} />
       <Mountains />
-      <Ground onGroundClick={handleGroundClick} />
+      <Ground onGroundClick={handleGroundClick} ground={sky.ground} field={sky.field} />
       <Trees />
-      <StreetLamps />
-      <Bench />
+      <StreetLamps level={sky.lamp} />
+      <Benches />
       <TargetRing ref={ring} />
-      <Character move={state} name={name} bubble={bubble} labelLayer={labelLayer} />
-      <CameraRig move={state} />
+      <ShadowTeachers myName={name} labelLayer={labelLayer} />
+      <Character name={name} bubble={bubble} labelLayer={labelLayer} />
+      <CameraRig />
     </>
   )
 }

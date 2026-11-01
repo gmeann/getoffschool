@@ -3,10 +3,10 @@ import { useMemo } from 'react'
 import type { ThreeEvent } from '@react-three/fiber'
 import { TRACK } from '../data/world'
 
-type Props = { onGroundClick: (point: THREE.Vector3) => void }
+type Props = { onGroundClick: (point: THREE.Vector3) => void; ground: THREE.Color; field: THREE.Color }
 
 /** 짙은 보라빛 흙바닥 + 타원형 벽돌색 트랙 */
-export function Ground({ onGroundClick }: Props) {
+export function Ground({ onGroundClick, ground, field }: Props) {
   const trackGeometry = useMemo(() => {
     const { rx, rz, width } = TRACK
     const shape = new THREE.Shape()
@@ -40,12 +40,12 @@ export function Ground({ onGroundClick }: Props) {
       {/* 넓은 바닥 (클릭 대상) */}
       <mesh rotation-x={-Math.PI / 2} onClick={handleClick}>
         <circleGeometry args={[220, 48]} />
-        <meshStandardMaterial color="#5b4763" roughness={1} />
+        <meshStandardMaterial color={ground} roughness={1} />
       </mesh>
       {/* 트랙 안쪽 운동장: 살짝 밝은 흙 */}
       <mesh rotation-x={-Math.PI / 2} position-y={0.005} scale={[TRACK.rx - TRACK.width, TRACK.rz - TRACK.width, 1]} raycast={() => null}>
         <circleGeometry args={[1, 40]} />
-        <meshStandardMaterial color="#665170" roughness={1} />
+        <meshStandardMaterial color={field} roughness={1} />
       </mesh>
       <mesh geometry={trackGeometry} rotation-x={-Math.PI / 2} position-y={0.01} raycast={() => null}>
         <meshStandardMaterial color="#b4644c" roughness={0.95} />

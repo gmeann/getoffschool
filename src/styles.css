@@ -47,7 +47,11 @@ html, body, #root {
 
 .hud-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 .hud-group { display: flex; align-items: center; gap: 8px; }
-.hud-group.right { flex-direction: row; }
+/* 우상단: 데스크톱은 한 줄, 칭호는 아래 줄 */
+.hud-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.hud-right-main { display: flex; align-items: center; gap: 8px; }
+.pill.laps strong { color: var(--accent); font-weight: 700; margin: 0 1px; font-variant-numeric: tabular-nums; }
+.pill.badge { height: 32px; font-size: 13px; font-weight: 600; background: rgba(247, 183, 119, 0.85); color: #3a2f52; border-color: rgba(255, 255, 255, 0.5); }
 
 .pill {
   pointer-events: auto;
@@ -71,6 +75,7 @@ html, body, #root {
 button.pill { cursor: pointer; transition: transform 0.12s ease, background 0.2s ease; }
 button.pill:hover { background: rgba(43, 37, 64, 0.62); }
 button.pill:active { transform: scale(0.94); }
+.pill.action.active { background: rgba(255, 244, 234, 0.9); color: #3a2f52; border-color: rgba(255, 255, 255, 0.7); }
 .pill.icon { width: 40px; padding: 0; justify-content: center; }
 .pill.title strong { font-weight: 700; }
 .pill.title .divider, .nametag-bar { opacity: 0.45; }
@@ -90,9 +95,10 @@ button.pill:active { transform: scale(0.94); }
   font-weight: 600;
   animation: pop 0.2s ease-out;
   position: absolute;
-  top: calc(env(safe-area-inset-top) + 64px);
+  bottom: calc(env(safe-area-inset-bottom) + 84px);
   left: 50%;
   transform: translateX(-50%);
+  white-space: nowrap;
 }
 
 /* 세로 폰: 상단을 두 줄로 나눠 겹치지 않게 */
@@ -101,10 +107,13 @@ button.pill:active { transform: scale(0.94); }
   .pill { height: 36px; padding: 0 12px; font-size: 13px; gap: 5px; }
   .pill.icon { width: 36px; }
   .hud-group { gap: 6px; }
-  .hud-group.right { flex-direction: column-reverse; align-items: flex-end; }
+  .hud-right { gap: 6px; }
+  .hud-right-main { flex-direction: column; align-items: flex-end; gap: 6px; }
+  .hud-right-main .icons { order: -1; }
+  .pill.badge { height: 30px; font-size: 12px; }
   .pill.action { height: 44px; padding: 0 16px; font-size: 14px; }
   .hud-bottom { gap: 8px; }
-  .toast { top: calc(env(safe-area-inset-top) + 100px); }
+  .toast { bottom: calc(env(safe-area-inset-bottom) + 78px); font-size: 13px; }
 }
 @media (max-width: 340px) {
   .pill.title .divider, .pill.title strong { display: none; }
@@ -126,6 +135,10 @@ button.pill:active { transform: scale(0.94); }
   white-space: nowrap;
 }
 .nametag-me { color: var(--accent); font-weight: 700; }
+/* 그림자 선생님 이름표/말풍선: 흐릿한 흰빛 */
+.nametag.ghost { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.22); color: rgba(255, 255, 255, 0.78); font-size: 10.5px; padding: 2px 8px; }
+.speech.ghost { background: rgba(255, 255, 255, 0.88); color: #4a4560; font-weight: 500; }
+.speech.ghost::after { border-top-color: rgba(255, 255, 255, 0.88); }
 .speech {
   position: relative;
   padding: 7px 13px;
