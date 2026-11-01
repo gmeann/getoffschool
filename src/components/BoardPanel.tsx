@@ -3,6 +3,8 @@ import { ANONYMOUS, BOARDS, MEMO_COLORS, POST_MAX, REASON_MAX, type BoardId, typ
 import { boardService, BoardError, type Post, type SortMode } from '../services/boardService'
 import { checkText } from '../services/moderation'
 import { useBoard, useKeyboardInset } from '../hooks/useBoard'
+import { getSettings } from '../hooks/settingsStore'
+import { audio } from '../audio/engine'
 
 /**
  * 메모보드·냉장고·칠판이 함께 쓰는 하단 시트 패널.
@@ -107,7 +109,7 @@ function Compose({ board, myName, onDone, onCancel }: { board: BoardId; myName: 
   const [text, setText] = useState('')
   const [reason, setReason] = useState('')
   const [color, setColor] = useState<MemoColor>('yellow')
-  const [anon, setAnon] = useState(false)
+  const [anon, setAnon] = useState(() => getSettings().anonDefault)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [cooldown, setCooldown] = useState(0)
@@ -259,6 +261,7 @@ export function BoardPanel({ board, myName, onClose }: Props) {
   const listRef = useRef<HTMLUListElement>(null)
 
   const react = async (p: Post) => {
+    audio.play('react')
     // 먼저 화면에 반영하고, 실패하면 되돌림
     const flip = (x: Post): Post => (x.id === p.id ? { ...x, reacted: !x.reacted, reactions: x.reactions + (x.reacted ? -1 : 1) } : x)
     setPosts((list) => list.map(flip))
@@ -274,6 +277,7 @@ export function BoardPanel({ board, myName, onClose }: Props) {
   const report = async (p: Post) => {
     try {
       await boardService.reportPost(board, p.id)
+      audio.play('soft')
       setPosts((list) => list.filter((x) => x.id !== p.id))
       setNotice('신고가 접수됐어요. 이 글은 목록에서 빼 둘게요')
     } catch (e) {
@@ -292,6 +296,7 @@ export function BoardPanel({ board, myName, onClose }: Props) {
   }
 
   const done = async (p: Post) => {
+    audio.play('stick')
     setView('list')
     setFresh(p.id)
     setStamp(true)

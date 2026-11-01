@@ -32,10 +32,11 @@ type Props = {
   /** 다른 선생님들이 나눈 마음 구름 */
   hearts?: Heart[]
   onHeart?: (h: Heart) => void
+  lowSpec?: boolean
 }
 
 /** 운동장 장면 */
-export function Playground({ name, bubble, labelLayer, onDoor, cloud, onCloudDone, hearts, onHeart }: Props) {
+export function Playground({ name, bubble, labelLayer, onDoor, cloud, onCloudDone, hearts, onHeart, lowSpec }: Props) {
   const ring = useRef<TargetRingHandle>(null)
   const sky = useTimeOfDay()
 
@@ -68,7 +69,7 @@ export function Playground({ name, bubble, labelLayer, onDoor, cloud, onCloudDon
       <Benches />
       <SchoolBuilding onDoor={onDoor} glow={Math.min(1, sky.lamp / 2.2)} labelLayer={labelLayer} />
       <TargetRing ref={ring} />
-      <ShadowTeachers myName={name} labelLayer={labelLayer} />
+      <ShadowTeachers myName={name} labelLayer={labelLayer} lowSpec={lowSpec} />
       <Character name={name} bubble={bubble} labelLayer={labelLayer} />
       {hearts && onHeart && <SharedHearts hearts={hearts} onOpen={onHeart} />}
       {cloud && onCloudDone && (

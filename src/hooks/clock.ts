@@ -25,7 +25,10 @@ export function storageGet(key: string): string | null {
     return null
   }
 }
+/** 기록을 지운 뒤 새로고침하기 전까지는 아무것도 다시 쓰지 않음 (페이지를 떠날 때 저장하는 코드 대비) */
+let frozen = false
 export function storageSet(key: string, value: string) {
+  if (frozen) return
   try {
     localStorage.setItem(PREFIX + key, value)
   } catch {
@@ -65,3 +68,11 @@ export const RESET_REQUESTED: boolean = (() => {
   window.history.replaceState(null, '', url.toString())
   return true
 })()
+
+/** 이 기기의 퇴근길 학교 기록을 모두 지움 (keep 에 적은 키는 남김) */
+export function clearLocalData(keep: string[] = []) {
+  const saved = keep.map((k) => [k, storageGet(k)] as const)
+  storageRemovePrefix('')
+  saved.forEach(([k, v]) => v !== null && storageSet(k, v))
+  frozen = true
+}

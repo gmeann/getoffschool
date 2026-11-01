@@ -44,6 +44,11 @@ function currentHour() {
   return d.getHours() + d.getMinutes() / 60
 }
 
+/** 지금 시간대 이름 (소리 분위기용) */
+export function currentTimeName(): TimeName {
+  return timeNameOf(currentHour())
+}
+
 export function skyAt(hour: number): Sky {
   let i = 0
   while (i < KEYFRAMES.length - 2 && hour >= KEYFRAMES[i + 1][0]) i++

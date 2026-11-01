@@ -40,3 +40,11 @@ export const PersonIcon = () => (
     <path d="M4 21a8 8 0 0 1 16 0" />
   </svg>
 )
+
+export const SoundOnIcon = () => (
+  <svg {...base}>
+    <path d="M11 5L6 9H3v6h3l5 4V5z" />
+    <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+    <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+  </svg>
+)

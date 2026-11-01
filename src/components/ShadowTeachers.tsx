@@ -35,8 +35,9 @@ let globalNextTalk = 0
 const rand = (a: number, b: number) => a + Math.random() * (b - a)
 
 /** 접속할 때마다 인원·속도·위치가 조금씩 달라짐 */
-function makeSpecs(myName: string): Spec[] {
-  const count = 6 + Math.floor(Math.random() * 3) // 6~8명
+function makeSpecs(myName: string, lowSpec = false): Spec[] {
+  // 저사양 모드에서는 3~4명
+  const count = lowSpec ? 3 + Math.floor(Math.random() * 2) : 6 + Math.floor(Math.random() * 3) // 6~8명
   const sitters = Math.min(BENCHES.length, 1 + Math.floor(Math.random() * 3)) // 1~3명
   const names = NICKNAMES.filter((n) => n !== myName).sort(() => Math.random() - 0.5)
   const benchOrder = BENCHES.map((_, i) => i).sort(() => Math.random() - 0.5)
@@ -131,8 +132,10 @@ function ShadowTeacher({ spec, labelLayer }: { spec: Spec; labelLayer: RefObject
 }
 
 /** 운동장을 산책하는 선생님들 (코드 이름은 ShadowTeachers 로 유지) */
-export function ShadowTeachers({ myName, labelLayer }: { myName: string; labelLayer: RefObject<HTMLDivElement> }) {
-  const specs = useMemo(() => makeSpecs(myName), [myName])
+export function ShadowTeachers({ myName, labelLayer, lowSpec = false }: { myName: string; labelLayer: RefObject<HTMLDivElement>; lowSpec?: boolean }) {
+  // 이름을 다시 뽑아도 산책하는 선생님들은 그대로 (저사양 모드가 바뀔 때만 다시 만듦)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const specs = useMemo(() => makeSpecs(myName, lowSpec), [lowSpec])
   return (
     <>
       {specs.map((s, i) => (

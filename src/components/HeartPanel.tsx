@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { HEART_REACTIONS, type HeartKind } from '../data/hearts'
 import type { Heart } from '../services/heartService'
+import { audio } from '../audio/engine'
 
 type Props = {
   heart: Heart
@@ -44,7 +45,10 @@ export function HeartPanel({ heart, onReact, onReport, onDelete, onClose, notice
               key={r.kind}
               className={`react-btn big ${heart.myReaction === r.kind ? 'on' : ''}`}
               aria-pressed={heart.myReaction === r.kind}
-              onClick={() => onReact(heart, r.kind)}
+              onClick={() => {
+                audio.play('react')
+                onReact(heart, r.kind)
+              }}
             >
               <span aria-hidden>{r.emoji}</span> {r.label} <strong>{heart.counts[r.kind]}</strong>
             </button>

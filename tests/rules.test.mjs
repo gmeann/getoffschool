@@ -242,3 +242,47 @@ t('방문자 수: 방문 기록과 함께 1회 허용, 같은 날 두 번째 거
   // 방문 기록 없이 방문자 수만 올리기도 거절
   await assertFails(setDoc(doc(db(BOB), 'daily', '2026-11-01'), { visitors: increment(1) }, { merge: true }))
 })
+
+// ---------- 관리자 ----------
+const adminDb = () => env.authenticatedContext('admin1', { firebase: { sign_in_provider: 'google.com' } }).firestore()
+const seedAdmin = () => seed((d) => setDoc(doc(d, 'admins', 'admin1'), { note: 'console' }))
+
+// 25
+t('관리자: 숨김 글이 포함된 신고 목록 조회 허용, 일반 사용자 거절', '허용', async () => {
+  await seedAdmin()
+  await seedPost('p1', ALICE, { reportCount: 3, hidden: true })
+  const q = (d) => getDocs(query(collection(d, 'posts'), where('reportCount', '>', 0), limit(50)))
+  await assertSucceeds(q(adminDb()))
+  await assertFails(q(db(BOB)))
+})
+// 26
+t('관리자 되살리기(숨김 해제 + 신고 0) 허용, 일반 사용자 거절', '허용', async () => {
+  await seedAdmin()
+  await seedPost('p1', ALICE, { reportCount: 3, hidden: true })
+  await assertFails(updateDoc(doc(db(BOB), 'posts', 'p1'), { hidden: false, reportCount: 0 }))
+  await assertSucceeds(updateDoc(doc(adminDb(), 'posts', 'p1'), { hidden: false, reportCount: 0 }))
+})
+// 27
+t('관리자는 남의 글 삭제 허용', '허용', async () => {
+  await seedAdmin()
+  await seedPost('p1', ALICE)
+  await assertSucceeds(deleteDoc(doc(adminDb(), 'posts', 'p1')))
+})
+// 28
+t('관리자도 글 내용 수정은 거절', '거절', async () => {
+  await seedAdmin()
+  await seedPost('p1', ALICE, { reportCount: 3, hidden: true })
+  await assertFails(updateDoc(doc(adminDb(), 'posts', 'p1'), { hidden: false, reportCount: 0, text: '바꿈' }))
+})
+// 29
+t('앱에서 관리자 문서 만들기 거절 (콘솔에서만)', '거절', async () => {
+  await assertFails(setDoc(doc(db(ALICE), 'admins', ALICE), { note: 'me' }))
+  await assertFails(setDoc(doc(adminDb(), 'admins', BOB), { note: 'friend' }))
+})
+// 30
+t('익명 계정은 관리자 문서가 있어도 관리자가 아님', '거절', async () => {
+  await seed((d) => setDoc(doc(d, 'admins', 'anon1'), { note: 'x' }))
+  await seedPost('p1', ALICE)
+  const anon = env.authenticatedContext('anon1', { firebase: { sign_in_provider: 'anonymous' } }).firestore()
+  await assertFails(deleteDoc(doc(anon, 'posts', 'p1')))
+})

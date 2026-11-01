@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ExitIcon, PersonIcon, SettingsIcon, SoundOffIcon } from './Icons'
+import { ExitIcon, PersonIcon, SettingsIcon, SoundOffIcon, SoundOnIcon } from './Icons'
 import { SCENES, SCENE_ORDER, type ActionId, type SceneId } from '../data/scenes'
 import type { PlayerUi } from '../hooks/playerStore'
 import { METHODS, type MethodChoice } from '../data/tasks'
@@ -24,10 +24,12 @@ type Props = {
   method: MethodChoice
   /** 서버 연결이 안 되면 '혼자 보는 모드' 안내 */
   offline: boolean
+  /** 소리(배경음악·효과음) 켜짐 여부 */
+  soundOn: boolean
 }
 
 /** HTML 오버레이 UI (알약형 반투명 버튼) */
-export function Hud({ sceneId, onAction, onScene, toast, player, laps, titles, hideBottom, counter, remaining, method, offline }: Props) {
+export function Hud({ sceneId, onAction, onScene, toast, player, laps, titles, hideBottom, counter, remaining, method, offline, soundOn }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const running = player.mode === 'run'
   const sitting = player.mode === 'sit' || player.mode === 'toSeat'
@@ -128,8 +130,13 @@ export function Hud({ sceneId, onAction, onScene, toast, player, laps, titles, h
               {sceneId === 'playground' && counter.shared && <span className="laps-all">· 모두 {counter.lapsToday}바퀴</span>}
             </div>
             <div className="hud-group icons">
-              <button className="pill icon" aria-label="소리 꺼짐" onClick={() => onAction('sound')}>
-                <SoundOffIcon />
+              <button
+                className={`pill icon ${soundOn ? 'on' : ''}`}
+                aria-label={soundOn ? '소리 끄기' : '소리 켜기'}
+                aria-pressed={soundOn}
+                onClick={() => onAction('sound')}
+              >
+                {soundOn ? <SoundOnIcon /> : <SoundOffIcon />}
               </button>
               <button className="pill icon" aria-label="설정" onClick={() => onAction('settings')}>
                 <SettingsIcon />

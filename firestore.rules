@@ -24,6 +24,23 @@ service cloud.firestore {
     // 글 수정은 아래 두 경우만: 반응(+1/-1), 신고(+1, 3건 이상이면 숨김)
     function onlyChanged(keys) { return data().diff(old()).affectedKeys().hasOnly(keys); }
 
+    // 관리자: Firebase 콘솔에서 만든 admins/{uid} 문서가 있는 (익명이 아닌) 계정
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous'
+        && exists(/databases/$(database)/documents/admins/$(me()));
+    }
+    // 관리자 되살리기: 숨김 해제 + 신고 수 0 (다른 필드는 못 바꿈)
+    function adminRestore() {
+      return isAdmin() && onlyChanged(['hidden', 'reportCount']) && data().hidden == false && data().reportCount == 0;
+    }
+
+    // ---------- 관리자 목록 (콘솔에서만 만들 수 있음) ----------
+    match /admins/{adminId} {
+      allow get: if signedIn() && adminId == me();
+      allow list, write: if false;
+    }
+
     // ---------- 사용자별 마지막 글쓰기 시각 ----------
     match /users/{userId} {
       allow read: if signedIn() && userId == me();
@@ -42,7 +59,7 @@ service cloud.firestore {
 
       // 목록 조회는 숨김이 아닌 글만 (쿼리에 hidden == false 조건이 있어야 통과)
       allow get: if signedIn();
-      allow list: if signedIn() && resource.data.hidden == false;
+      allow list: if signedIn() && (resource.data.hidden == false || isAdmin());
 
       allow create: if signedIn()
         && data().keys().hasOnly(['board', 'text', 'color', 'reason', 'nick', 'uid', 'createdAt', 'reactionCount', 'reportCount', 'hidden'])
@@ -60,6 +77,8 @@ service cloud.firestore {
         && gateTouched();
 
       allow update: if signedIn() && (
+        adminRestore()
+        ||
         // 반응 +1: 내 반응 문서를 새로 만들 때만
         (onlyChanged(['reactionCount'])
           && data().reactionCount == old().reactionCount + 1
@@ -77,7 +96,7 @@ service cloud.firestore {
           && !exists(reportPath()) && existsAfter(reportPath()))
       );
 
-      allow delete: if signedIn() && old().uid == me();
+      allow delete: if signedIn() && (old().uid == me() || isAdmin());
 
       match /reactions/{userId} {
         allow read: if signedIn() && userId == me();
@@ -105,7 +124,7 @@ service cloud.firestore {
       function myReportPath() { return /databases/$(database)/documents/hearts/$(heartId)/reports/$(me()); }
 
       allow get: if signedIn();
-      allow list: if signedIn() && resource.data.hidden == false;
+      allow list: if signedIn() && (resource.data.hidden == false || isAdmin());
 
       allow create: if signedIn()
         && data().keys().hasOnly(['text', 'nick', 'uid', 'createdAt', 'pat', 'thanks', 'together', 'reportCount', 'hidden'])
@@ -120,6 +139,8 @@ service cloud.firestore {
         && gateTouched();
 
       allow update: if signedIn() && (
+        adminRestore()
+        ||
         // 반응 +1: 새로 만든 내 반응 문서의 종류(kind) 칸만 1 증가
         (existsAfter(myReactionPath()) && !exists(myReactionPath())
           && onlyChanged([getAfter(myReactionPath()).data.kind])
@@ -137,7 +158,7 @@ service cloud.firestore {
           && !exists(myReportPath()) && existsAfter(myReportPath()))
       );
 
-      allow delete: if signedIn() && old().uid == me();
+      allow delete: if signedIn() && (old().uid == me() || isAdmin());
 
       match /reactions/{userId} {
         allow read: if signedIn() && userId == me();

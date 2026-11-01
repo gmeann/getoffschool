@@ -18,6 +18,13 @@ import { HeartPanel } from './components/HeartPanel'
 import { heartService, HeartError, type Heart } from './services/heartService'
 import { getFirebase, getNetStatus, isOnline, subscribeNetStatus } from './services/firebase'
 import type { HeartKind } from './data/hearts'
+import { SettingsPanel } from './components/SettingsPanel'
+import { AdminPanel, AdminSection } from './components/AdminPanel'
+import { ADMIN_FLAG } from './services/adminService'
+import { getSettings, subscribeSettings, updateSettings } from './hooks/settingsStore'
+import { audio } from './audio/engine'
+import { currentTimeName } from './hooks/useTimeOfDay'
+import { clearLocalData } from './hooks/clock'
 import { MethodPicker } from './components/MethodPicker'
 import { AddPaper } from './components/AddPaper'
 import { pileTop } from './components/PaperPile'
@@ -58,7 +65,7 @@ type Dialog = { npc: NpcDef; text: string; gift: Snack | null }
 
 export default function App() {
   // 접속할 때마다 무작위 이름 (새로고침하면 바뀜)
-  const [name] = useState(pickRandomNickname)
+  const [name, setName] = useState(pickRandomNickname)
   const [ready, setReady] = useState(false)
   const [sceneId, setSceneId] = useState<SceneId>('playground')
   const [fading, setFading] = useState(false)
@@ -79,6 +86,9 @@ export default function App() {
   const [heartOpen, setHeartOpen] = useState<Heart | null>(null)
   const [heartNotice, setHeartNotice] = useState<string | null>(null)
   const netStatus = useSyncExternalStore(subscribeNetStatus, getNetStatus)
+  const settings = useSyncExternalStore(subscribeSettings, getSettings)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [adminOpen, setAdminOpen] = useState(false)
   const effectsRef = useRef<TaskEffectsHandle | null>(null)
   const [floatSnack, setFloatSnack] = useState<{ snack: Snack; key: number } | null>(null)
   const [npcBubbles, setNpcBubbles] = useState<Partial<Record<NpcId, string>>>({})
@@ -120,10 +130,14 @@ export default function App() {
       onLapEvent((e) => {
         if (e.type === 'lap') {
           showBubble('한 바퀴 완주!', 2200)
+          audio.play('lap')
           counterService.addLaps(1) // 모두의 바퀴 합계에 더함 (모았다가 10초마다 전송)
         }
         // 업무 완료 칭호는 완료 문구와 함께 따로 보여 줌
-        else if (e.title !== TITLE_DONE) showToast(`🏅 칭호 획득! '${e.title}'`, 3500)
+        else {
+          audio.play('title')
+          if (e.title !== TITLE_DONE) showToast(`🏅 칭호 획득! '${e.title}'`, 3500)
+        }
       }),
     [showBubble, showToast],
   )
@@ -145,6 +159,8 @@ export default function App() {
       setHeartOpen(null)
       player.mindView = 0
       void counterService.flush() // 장면을 나갈 때 모아 둔 증가분 전송
+      audio.play('door')
+      setSettingsOpen(false)
       setFading(true)
       window.setTimeout(() => {
         // 화면이 완전히 어두워진 뒤 장면 교체 (이전 장면은 언마운트되며 자원 정리)
@@ -199,6 +215,7 @@ export default function App() {
       return
     }
     setDialog({ ...dialog, text: dialog.npc.giveLine(snack.name), gift: snack })
+    audio.play('snack')
     setFloatSnack({ snack, key: Date.now() })
     showBubble(`${snack.emoji ?? '🍪'} ${snack.name} 받았어요!`, 2200)
   }, [dialog, showBubble])
@@ -231,6 +248,7 @@ export default function App() {
     }
     const npc = best
     bow(npc)
+    audio.play('greet')
     window.setTimeout(() => {
       setNpcBows((b) => ({ ...b, [npc.id]: Date.now() }))
       showNpcBubble(npc.id, pickFrom(npc.greetings))
@@ -248,6 +266,13 @@ export default function App() {
     void getFirebase()
     counterService.start()
   }, [])
+
+  // 소리 분위기: 장면·시간대에 맞춤 (1분마다 시간대 확인)
+  useEffect(() => {
+    audio.setMood(sceneId, currentTimeName())
+    const id = window.setInterval(() => audio.setMood(sceneId, currentTimeName()), 60_000)
+    return () => window.clearInterval(id)
+  }, [sceneId])
 
   // 장면에 들어갈 때만 카운터를 한 번 읽음 (실시간 구독 없음)
   useEffect(() => {
@@ -321,9 +346,10 @@ export default function App() {
     setMindOpen(false)
     const crisis = hasCrisisSignal(text)
     // 나누기를 켠 경우에만 서버로 보냄. 위기 신호가 있으면 나누지 않고 혼자 띄우기만
+    audio.play('cloud')
     if (share && !crisis) {
       heartService
-        .addHeart(text, name)
+        .addHeart(text, getSettings().anonDefault ? '익명의 선생님' : name)
         .then((h) => {
           setHearts((list) => [h, ...list].slice(0, 12))
           showToast(MIND_TEXT.shareDone, 2800)
@@ -356,6 +382,7 @@ export default function App() {
       return
     }
     effectsRef.current?.play(r.method, r.label, pileTop(before))
+    audio.play(r.method)
     showBubble(r.line, 1600)
     if (r.done) {
       window.setTimeout(() => showToast(`🎉 오늘 업무 끝! 퇴근 준비 완료 · 🏅 칭호 '${TITLE_DONE}'`, 4200), 900)
@@ -366,10 +393,13 @@ export default function App() {
     (action: HudAction) => {
       switch (action) {
         case 'run':
+          audio.play('tap')
           return toggleRun()
         case 'sit':
+          audio.play('tap')
           return toggleSit()
         case 'sky':
+          audio.play('tap')
           return toggleSky()
         case 'book':
           return setBookOpen(true)
@@ -387,8 +417,16 @@ export default function App() {
           return openBoard(action)
         case 'mind':
           return openMind()
-        case 'sound':
-          return showToast(`소리는 ${SOON}`)
+        case 'sound': {
+          // 상단 소리 버튼: 배경음악·효과음을 한 번에 켜고 끄기 (선택은 기억됨)
+          const on = !(getSettings().bgm || getSettings().sfx)
+          updateSettings({ bgm: on, sfx: on })
+          if (on) window.setTimeout(() => audio.play('tap'), 50)
+          return showToast(on ? '🔊 소리를 켰어요. 설정에서 크기를 바꿀 수 있어요' : '🔇 소리를 껐어요', 1800)
+        }
+        case 'settings':
+          audio.play('tap')
+          return setSettingsOpen(true)
         default:
           return showToast(SOON)
       }
@@ -402,7 +440,7 @@ export default function App() {
     <div className="app">
       <Canvas
         className="scene"
-        dpr={[1, 2]}
+        dpr={[1, settings.lowSpec ? 1 : 2]}
         shadows={false}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
         camera={{ fov: 45, near: 0.1, far: 900, position: [0, 6, 17] }}
@@ -421,7 +459,11 @@ export default function App() {
               cloud={cloud ? { key: cloud.key, text: cloud.text, origin: cloud.origin } : null}
               onCloudDone={cloudDone}
               hearts={hearts}
-              onHeart={(h) => setHeartOpen(h)}
+              onHeart={(h) => {
+                audio.play('tap')
+                setHeartOpen(h)
+              }}
+              lowSpec={settings.lowSpec}
             />
           )}
           {sceneId === 'classroom' && (
@@ -456,6 +498,7 @@ export default function App() {
         remaining={taskUi.remaining}
         method={taskUi.method}
         offline={netStatus === 'offline'}
+        soundOn={settings.bgm || settings.sfx}
       />
 
       {dialog && (
@@ -510,6 +553,39 @@ export default function App() {
           shareCheck={() => (isOnline() ? heartService.cooldownLeft() : -1)}
         />
       )}
+      {settingsOpen && (
+        <SettingsPanel
+          settings={settings}
+          name={name}
+          onChange={(patch) => {
+            updateSettings(patch)
+            audio.play('tap')
+          }}
+          onReroll={() => {
+            let next = pickRandomNickname()
+            while (next === name) next = pickRandomNickname()
+            setName(next)
+            audio.play('tap')
+            showBubble(`오늘은 '${next}'(으)로 할게요`, 2200)
+          }}
+          onClearData={() => {
+            clearLocalData(['settings'])
+            window.location.reload()
+          }}
+          onClose={() => setSettingsOpen(false)}
+          admin={
+            ADMIN_FLAG ? (
+              <AdminSection
+                onOpen={() => {
+                  setSettingsOpen(false)
+                  setAdminOpen(true)
+                }}
+              />
+            ) : undefined
+          }
+        />
+      )}
+      {adminOpen && <AdminPanel onClose={() => setAdminOpen(false)} />}
       {heartOpen && (
         <HeartPanel
           heart={heartOpen}

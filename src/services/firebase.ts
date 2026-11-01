@@ -6,9 +6,19 @@
  * - Analytics 는 쓰지 않음 (마음 띄우기 원칙: 분석 도구 금지)
  */
 import type { Firestore } from 'firebase/firestore'
+import type { Auth } from 'firebase/auth'
 
 export type FirestoreModule = typeof import('firebase/firestore')
-export type Fb = { db: Firestore; uid: string; fs: FirestoreModule }
+export type AuthModule = typeof import('firebase/auth')
+export type Fb = {
+  db: Firestore
+  uid: string
+  fs: FirestoreModule
+  auth: Auth
+  authMod: AuthModule
+  /** 익명 로그인인지 (관리자는 Google 로그인) */
+  anonymous: boolean
+}
 
 export type NetStatus = 'connecting' | 'online' | 'offline'
 
@@ -111,10 +121,12 @@ export function getFirebase(): Promise<Fb | null> {
         auth.connectAuthEmulator(a, `http://${host}:9099`, { disableWarnings: true })
         fs.connectFirestoreEmulator(db, host, 8080)
       }
-      const cred = await withTimeout(auth.signInAnonymously(a), 15000)
+      // 이전에 로그인한 계정(관리자 Google 로그인 포함)이 있으면 그대로, 없으면 익명 로그인
+      await withTimeout(a.authStateReady(), 8000).catch(() => undefined)
+      const user = a.currentUser ?? (await withTimeout(auth.signInAnonymously(a), 15000)).user
       signedIn = true
       setStatus('online')
-      return { db, uid: cred.user.uid, fs }
+      return { db, uid: user.uid, fs, auth: a, authMod: auth, anonymous: user.isAnonymous }
     } catch {
       setStatus('offline')
       return null
