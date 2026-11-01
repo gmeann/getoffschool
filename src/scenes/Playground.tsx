@@ -17,6 +17,8 @@ import { SchoolBuilding } from '../components/SchoolBuilding'
 import { PLAYGROUND_WORLD } from '../data/world'
 import type { Door } from '../data/scenes'
 import { MindCloud } from '../components/MindCloud'
+import { SharedHearts } from '../components/SharedHearts'
+import type { Heart } from '../services/heartService'
 import { useTimeOfDay } from '../hooks/useTimeOfDay'
 
 type Props = {
@@ -27,10 +29,13 @@ type Props = {
   /** 마음 띄우기 구름 (글은 메모리에만, 끝나면 onCloudDone 에서 비움) */
   cloud?: { key: number; text: string; origin: THREE.Vector3 } | null
   onCloudDone?: () => void
+  /** 다른 선생님들이 나눈 마음 구름 */
+  hearts?: Heart[]
+  onHeart?: (h: Heart) => void
 }
 
 /** 운동장 장면 */
-export function Playground({ name, bubble, labelLayer, onDoor, cloud, onCloudDone }: Props) {
+export function Playground({ name, bubble, labelLayer, onDoor, cloud, onCloudDone, hearts, onHeart }: Props) {
   const ring = useRef<TargetRingHandle>(null)
   const sky = useTimeOfDay()
 
@@ -65,6 +70,7 @@ export function Playground({ name, bubble, labelLayer, onDoor, cloud, onCloudDon
       <TargetRing ref={ring} />
       <ShadowTeachers myName={name} labelLayer={labelLayer} />
       <Character name={name} bubble={bubble} labelLayer={labelLayer} />
+      {hearts && onHeart && <SharedHearts hearts={hearts} onOpen={onHeart} />}
       {cloud && onCloudDone && (
         <MindCloud key={cloud.key} text={cloud.text} origin={cloud.origin} onDone={onCloudDone} labelLayer={labelLayer} />
       )}

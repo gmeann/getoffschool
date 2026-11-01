@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { ExitIcon, PersonIcon, SettingsIcon, SoundOffIcon } from './Icons'
-import { TODAY_VISITORS } from '../data/world'
 import { SCENES, SCENE_ORDER, type ActionId, type SceneId } from '../data/scenes'
 import type { PlayerUi } from '../hooks/playerStore'
 import { METHODS, type MethodChoice } from '../data/tasks'
@@ -23,10 +22,12 @@ type Props = {
   counter: CounterSnapshot
   remaining: number
   method: MethodChoice
+  /** 서버 연결이 안 되면 '혼자 보는 모드' 안내 */
+  offline: boolean
 }
 
 /** HTML 오버레이 UI (알약형 반투명 버튼) */
-export function Hud({ sceneId, onAction, onScene, toast, player, laps, titles, hideBottom, counter, remaining, method }: Props) {
+export function Hud({ sceneId, onAction, onScene, toast, player, laps, titles, hideBottom, counter, remaining, method, offline }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const running = player.mode === 'run'
   const sitting = player.mode === 'sit' || player.mode === 'toSeat'
@@ -98,10 +99,15 @@ export function Hud({ sceneId, onAction, onScene, toast, player, laps, titles, h
             )}
           </div>
         </div>
+          {offline && (
+            <div className="pill offline-chip" role="status">
+              🌙 지금은 혼자 보는 모드예요
+            </div>
+          )}
           {sceneId === 'classroom' && (
             <div className="pill counter" aria-label={`오늘 날린 업무 ${counter.today}장, 누적 ${counter.total}장`}>
               <span>
-                📮 오늘 날린 업무 <strong>{counter.today}</strong>장
+                📮 {counter.shared ? '오늘 선생님들이 날린 업무' : '오늘 날린 업무'} <strong>{counter.today}</strong>장
               </span>
               <span className="sep">·</span>
               <span>
@@ -113,12 +119,13 @@ export function Hud({ sceneId, onAction, onScene, toast, player, laps, titles, h
 
         <div className="hud-right">
           <div className="hud-right-main">
-            <div className="pill count" aria-label={`오늘 ${TODAY_VISITORS}명 방문`}>
+            <div className="pill count" aria-label={`오늘 ${counter.visitors}명 다녀감`}>
               <PersonIcon />
-              오늘 {TODAY_VISITORS}명
+              오늘 {counter.visitors}명
             </div>
             <div className="pill laps" aria-label={`오늘 나는 ${laps}바퀴`}>
               👟 오늘 나는 <strong>{laps.toFixed(1)}</strong>바퀴
+              {sceneId === 'playground' && counter.shared && <span className="laps-all">· 모두 {counter.lapsToday}바퀴</span>}
             </div>
             <div className="hud-group icons">
               <button className="pill icon" aria-label="소리 꺼짐" onClick={() => onAction('sound')}>

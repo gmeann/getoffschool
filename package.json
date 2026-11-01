@@ -6,16 +6,21 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:emu": "VITE_USE_EMULATOR=1 vite",
+    "emu": "firebase emulators:start --only auth,firestore --project demo-getoffschool",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-getoffschool \"node --test --test-concurrency=1 tests/rules.test.mjs\""
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.5.0",
+    "firebase": "13.0.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "three": "^0.180.0"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "6.0.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@types/three": "^0.180.0",

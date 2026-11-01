@@ -14,6 +14,10 @@ import { MIND_TEXT } from './data/mindFloat'
 import { hasCrisisSignal } from './services/mindSafety'
 import { floatedToday, markFloatedToday } from './hooks/mindStore'
 import * as THREE from 'three'
+import { HeartPanel } from './components/HeartPanel'
+import { heartService, HeartError, type Heart } from './services/heartService'
+import { getFirebase, getNetStatus, isOnline, subscribeNetStatus } from './services/firebase'
+import type { HeartKind } from './data/hearts'
 import { MethodPicker } from './components/MethodPicker'
 import { AddPaper } from './components/AddPaper'
 import { pileTop } from './components/PaperPile'
@@ -70,6 +74,11 @@ export default function App() {
   const [mindOpen, setMindOpen] = useState(false)
   const [cloud, setCloud] = useState<{ key: number; text: string; origin: THREE.Vector3; crisis: boolean } | null>(null)
   const [crisisOpen, setCrisisOpen] = useState(false)
+  // 6단계: 하늘의 나눈 마음 구름 (운동장에 들어갈 때 한 번 불러옴)
+  const [hearts, setHearts] = useState<Heart[]>([])
+  const [heartOpen, setHeartOpen] = useState<Heart | null>(null)
+  const [heartNotice, setHeartNotice] = useState<string | null>(null)
+  const netStatus = useSyncExternalStore(subscribeNetStatus, getNetStatus)
   const effectsRef = useRef<TaskEffectsHandle | null>(null)
   const [floatSnack, setFloatSnack] = useState<{ snack: Snack; key: number } | null>(null)
   const [npcBubbles, setNpcBubbles] = useState<Partial<Record<NpcId, string>>>({})
@@ -109,7 +118,10 @@ export default function App() {
   useEffect(
     () =>
       onLapEvent((e) => {
-        if (e.type === 'lap') showBubble('한 바퀴 완주!', 2200)
+        if (e.type === 'lap') {
+          showBubble('한 바퀴 완주!', 2200)
+          counterService.addLaps(1) // 모두의 바퀴 합계에 더함 (모았다가 10초마다 전송)
+        }
         // 업무 완료 칭호는 완료 문구와 함께 따로 보여 줌
         else if (e.title !== TITLE_DONE) showToast(`🏅 칭호 획득! '${e.title}'`, 3500)
       }),
@@ -130,7 +142,9 @@ export default function App() {
       setMindOpen(false)
       setCloud(null)
       setCrisisOpen(false)
+      setHeartOpen(null)
       player.mindView = 0
+      void counterService.flush() // 장면을 나갈 때 모아 둔 증가분 전송
       setFading(true)
       window.setTimeout(() => {
         // 화면이 완전히 어두워진 뒤 장면 교체 (이전 장면은 언마운트되며 자원 정리)
@@ -229,6 +243,62 @@ export default function App() {
     walkTo(o.front, { x: o.x, z: o.z, radius: 2.0, onArrive: () => setBoardOpen(b) })
   }, [])
 
+  // 앱 시작: 익명 로그인 → 오늘 방문 집계 → 카운터 읽기 (실패해도 혼자 보는 모드로 계속)
+  useEffect(() => {
+    void getFirebase()
+    counterService.start()
+  }, [])
+
+  // 장면에 들어갈 때만 카운터를 한 번 읽음 (실시간 구독 없음)
+  useEffect(() => {
+    if (ready) void counterService.refresh()
+  }, [sceneId, ready])
+
+  // 운동장에 들어갈 때 나눈 마음 구름을 한 번 불러옴
+  useEffect(() => {
+    if (sceneId !== 'playground') return
+    let alive = true
+    void heartService.getHearts().then((list) => alive && setHearts(list))
+    return () => {
+      alive = false
+    }
+  }, [sceneId, netStatus === 'online'])
+
+  const reactHeart = useCallback(async (h: Heart, kind: HeartKind) => {
+    try {
+      const next = await heartService.toggleReaction(h, kind)
+      setHearts((list) => list.map((x) => (x.id === next.id ? next : x)))
+      setHeartOpen(next)
+    } catch (e) {
+      setHeartNotice(e instanceof HeartError ? e.message : '반응을 남기지 못했어요')
+      window.setTimeout(() => setHeartNotice(null), 2400)
+    }
+  }, [])
+
+  const reportHeart = useCallback(async (h: Heart) => {
+    try {
+      await heartService.report(h)
+      setHearts((list) => list.filter((x) => x.id !== h.id))
+      setHeartOpen(null)
+      showToast('신고가 접수됐어요. 이 구름은 하늘에서 빼 둘게요', 2600)
+    } catch (e) {
+      setHeartNotice(e instanceof HeartError ? e.message : '신고하지 못했어요')
+      window.setTimeout(() => setHeartNotice(null), 2400)
+    }
+  }, [showToast])
+
+  const deleteHeart = useCallback(async (h: Heart) => {
+    try {
+      await heartService.deleteMine(h)
+      setHearts((list) => list.filter((x) => x.id !== h.id))
+      setHeartOpen(null)
+      showToast('내가 나눈 마음을 지웠어요', 2000)
+    } catch (e) {
+      setHeartNotice(e instanceof HeartError ? e.message : '지우지 못했어요')
+      window.setTimeout(() => setHeartNotice(null), 2400)
+    }
+  }, [showToast])
+
   // 연구실에 처음 들어오면 한 번만 안내
   useEffect(() => {
     if (sceneId === 'lab' && shouldShowLabGuide()) setLabGuide(true)
@@ -247,15 +317,27 @@ export default function App() {
     player.mindView = 0
   }, [])
 
-  const sendMind = useCallback((text: string) => {
+  const sendMind = useCallback((text: string, share: boolean) => {
     setMindOpen(false)
     const crisis = hasCrisisSignal(text)
+    // 나누기를 켠 경우에만 서버로 보냄. 위기 신호가 있으면 나누지 않고 혼자 띄우기만
+    if (share && !crisis) {
+      heartService
+        .addHeart(text, name)
+        .then((h) => {
+          setHearts((list) => [h, ...list].slice(0, 12))
+          showToast(MIND_TEXT.shareDone, 2800)
+        })
+        .catch(() => showToast(MIND_TEXT.shareFailed, 2800))
+    } else if (share && crisis) {
+      showToast(MIND_TEXT.shareCrisis, 2400)
+    }
     const origin = new THREE.Vector3(player.position.x, 2.45 + player.sitLift, player.position.z)
     setCloud({ key: Date.now(), text, origin, crisis })
     player.mindView = 2
     // 저장하는 건 "오늘 띄웠다"는 날짜 하나뿐
     markFloatedToday()
-  }, [])
+  }, [name, showToast])
 
   const cloudDone = useCallback(() => {
     const crisis = cloud?.crisis ?? false
@@ -338,6 +420,8 @@ export default function App() {
               {...sceneProps}
               cloud={cloud ? { key: cloud.key, text: cloud.text, origin: cloud.origin } : null}
               onCloudDone={cloudDone}
+              hearts={hearts}
+              onHeart={(h) => setHeartOpen(h)}
             />
           )}
           {sceneId === 'classroom' && (
@@ -367,10 +451,11 @@ export default function App() {
         player={playerUi}
         laps={lapUi.laps}
         titles={lapUi.titles}
-        hideBottom={!!dialog || !!boardOpen || mindOpen || !!cloud}
+        hideBottom={!!dialog || !!boardOpen || mindOpen || !!cloud || !!heartOpen}
         counter={counter}
         remaining={taskUi.remaining}
         method={taskUi.method}
+        offline={netStatus === 'offline'}
       />
 
       {dialog && (
@@ -418,7 +503,23 @@ export default function App() {
 
       {/* 구름이 떠오르는 동안 3D 클릭 이동 막기 */}
       {cloud && <div className="input-blocker" aria-hidden />}
-      {mindOpen && <MindCompose onSend={sendMind} onClose={closeMind} />}
+      {mindOpen && (
+        <MindCompose
+          onSend={sendMind}
+          onClose={closeMind}
+          shareCheck={() => (isOnline() ? heartService.cooldownLeft() : -1)}
+        />
+      )}
+      {heartOpen && (
+        <HeartPanel
+          heart={heartOpen}
+          onReact={reactHeart}
+          onReport={reportHeart}
+          onDelete={deleteHeart}
+          onClose={() => setHeartOpen(null)}
+          notice={heartNotice}
+        />
+      )}
       {crisisOpen && <CrisisDialog onClose={() => setCrisisOpen(false)} />}
 
       {boardOpen && <BoardPanel key={boardOpen} board={boardOpen} myName={name} onClose={() => setBoardOpen(null)} />}

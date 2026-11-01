@@ -29,15 +29,18 @@ function PostCard({
   highlight,
   onReact,
   onDelete,
+  onReport,
 }: {
   post: Post
   board: BoardId
   highlight: boolean
   onReact: (p: Post) => void
   onDelete: (p: Post) => void
+  onReport: (p: Post) => void
 }) {
   const cfg = BOARDS[board]
   const [confirm, setConfirm] = useState(false)
+  const [reportAsk, setReportAsk] = useState(false)
   return (
     <li
       className={`post-card ${board} ${highlight ? 'fresh' : ''}`}
@@ -57,6 +60,23 @@ function PostCard({
           {post.mine && <em className="mine-tag">내 글</em>}
         </span>
         <span className="post-actions">
+          {!post.mine &&
+            !post.seed &&
+            (reportAsk ? (
+              <span className="confirm">
+                신고할까요?
+                <button className="mini danger" onClick={() => onReport(post)}>
+                  신고
+                </button>
+                <button className="mini" onClick={() => setReportAsk(false)}>
+                  취소
+                </button>
+              </span>
+            ) : (
+              <button className="mini ghost" onClick={() => setReportAsk(true)} aria-label="이 글 신고하기">
+                신고
+              </button>
+            ))}
           {post.mine &&
             (confirm ? (
               <span className="confirm">
@@ -250,6 +270,18 @@ export function BoardPanel({ board, myName, onClose }: Props) {
     }
   }
 
+  const [notice, setNotice] = useState<string | null>(null)
+  const report = async (p: Post) => {
+    try {
+      await boardService.reportPost(board, p.id)
+      setPosts((list) => list.filter((x) => x.id !== p.id))
+      setNotice('신고가 접수됐어요. 이 글은 목록에서 빼 둘게요')
+    } catch (e) {
+      setNotice(e instanceof BoardError ? e.message : '신고하지 못했어요. 잠시 후 다시 해 주세요')
+    }
+    window.setTimeout(() => setNotice(null), 2600)
+  }
+
   const remove = async (p: Post) => {
     try {
       await boardService.deleteMyPost(board, p.id)
@@ -313,7 +345,7 @@ export function BoardPanel({ board, myName, onClose }: Props) {
               )}
               {error && <li className="loading-row">{error}</li>}
               {posts.map((p) => (
-                <PostCard key={p.id} post={p} board={board} highlight={p.id === fresh} onReact={react} onDelete={remove} />
+                <PostCard key={p.id} post={p} board={board} highlight={p.id === fresh} onReact={react} onDelete={remove} onReport={report} />
               ))}
               {loading && posts.length > 0 && <li className="loading-row small">새로 불러오는 중…</li>}
             </ul>
@@ -329,6 +361,11 @@ export function BoardPanel({ board, myName, onClose }: Props) {
           </div>
         )}
         {stamp && <div className="stamp">붙였어요!</div>}
+        {notice && (
+          <div className="sheet-notice" role="status">
+            {notice}
+          </div>
+        )}
       </section>
     </div>
   )

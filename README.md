@@ -110,6 +110,105 @@ npm run preview
   - 6단계에서 같은 인터페이스의 Firebase 구현을 만들어 파일 맨 아래 `boardService` 한 줄만 바꾸면 돼요.
 - 저장 위치: `getoffschool:board:posts:게시판`(내 글), `getoffschool:board:reacted`(내 반응), `getoffschool:board:lastPostAt`(연속 입력 제한), `getoffschool:guide:lab`(첫 안내)
 
+## 6단계: Firebase 공유 (게시판 · 마음 나누기 · 공유 카운터)
+
+### 설정
+1. `.env.example` 을 `.env.local` 로 복사하고 Firebase 웹 앱 설정 값을 채웁니다. `.env.local` 은 git 에 올라가지 않아요.
+2. 값이 없거나 연결에 실패하면 앱은 **"지금은 혼자 보는 모드예요"** 안내와 함께 시드 글 + 로컬 저장으로 계속 동작해요.
+3. 개발용: 주소에 `?offline=1` 을 붙이면 Firebase 를 아예 쓰지 않아요.
+4. Analytics(measurementId)는 쓰지 않아요 (마음 띄우기 원칙: 분석 도구 금지).
+
+### GitHub Pages 빌드용 변수 (레포 Settings → Secrets and variables → Actions → **Variables** 탭)
+아래 6개를 **Variables**(Secrets 아님)로 등록하세요. 웹 설정 값은 브라우저에 그대로 내려가는 공개 값이라 비밀이 아니에요. 보안은 아래 규칙이 담당해요.
+
+| 이름 | 값 |
+| --- | --- |
+| `VITE_FIREBASE_API_KEY` | apiKey |
+| `VITE_FIREBASE_AUTH_DOMAIN` | authDomain |
+| `VITE_FIREBASE_PROJECT_ID` | projectId |
+| `VITE_FIREBASE_STORAGE_BUCKET` | storageBucket |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | messagingSenderId |
+| `VITE_FIREBASE_APP_ID` | appId |
+
+등록하지 않으면 배포본은 혼자 보는 모드로 빌드돼요.
+
+### 에뮬레이터로 개발·테스트 (Java 11+ 필요)
+```bash
+npm i -g firebase-tools@15.33.0
+```
+```bash
+npm run emu          # 터미널 1: Auth + Firestore 에뮬레이터 (가짜 프로젝트 demo-getoffschool)
+```
+```bash
+npm run dev:emu      # 터미널 2: 에뮬레이터에 붙는 개발 서버
+```
+```bash
+npm run test:rules   # 보안 규칙 테스트 24개 (에뮬레이터를 띄웠다가 끔)
+```
+
+### 규칙·인덱스 배포 (내 PC에서, 로그인된 상태)
+```bash
+firebase login
+```
+```bash
+firebase deploy --only firestore --project getoffschool
+```
+`firestore.rules`(보안 규칙)와 `firestore.indexes.json`(공감순 정렬용 복합 인덱스)이 함께 올라가요. 인덱스는 만드는 데 몇 분 걸릴 수 있어요.
+
+### 데이터 구조
+| 경로 | 내용 |
+| --- | --- |
+| `posts/{id}` | board(`memo`/`fridge`/`blackboard`), text(1~60자), color(메모보드), reason(냉장고), nick, uid, createdAt(서버 시각), reactionCount, reportCount, hidden |
+| `posts/{id}/reactions/{uid}` | 사용자당 반응 1회 보장 (지우면 반응 취소 = -1) |
+| `posts/{id}/reports/{uid}` | 사용자당 신고 1회, 3건이면 hidden=true |
+| `hearts/{id}` | 마음 나누기: text(1~100자), nick, uid, createdAt, pat·thanks·together, reportCount, hidden |
+| `hearts/{id}/reactions/{uid}` | { kind } — 한 글에 반응 하나 (바꾸면 취소 후 새로) |
+| `hearts/{id}/reports/{uid}` | 사용자당 신고 1회 |
+| `users/{uid}` | { lastWriteAt } — 글쓰기 30초 도배 방지 (글과 같은 batch 로만 갱신) |
+| `daily/{YYYY-MM-DD}` | { flung, laps, visitors } — 날짜별 카운터 (한 문서에 쓰기가 몰리지 않게 날짜로 나눔) |
+| `counters/total` | { flung } — 누적 날린 업무 |
+| `visits/{YYYY-MM-DD}/users/{uid}` | 오늘 방문 기록 (사용자당 하루 1회, 만들 때만 visitors +1) |
+
+- 시드 글은 DB 에 넣지 않고 화면에서 합쳐요. 한 게시판에 최대 30개를 보여 주는데, 진짜 글이 늘면 시드는 뒤로 밀려 사라져요. 시드 글은 신고·삭제 대상이 아니고, 시드 글 반응은 이 기기에만 저장돼요.
+- 제안 구조에서 바꾼 점: ① 반응 **취소(-1)** 를 허용 (5단계 UI 의 "다시 누르면 취소"를 유지하려고, 내 반응 문서를 지울 때만 -1 가능) ② 카운터를 `daily/{날짜}` 와 `counters/total` 로 나눔 ③ 목록 조회 규칙에 `hidden == false` 를 강제해서 숨김 글이 쿼리로 내려오지 않게 함.
+
+### 보안 규칙 요약 (`firestore.rules`)
+- 모든 읽기·쓰기는 로그인(익명 포함)한 사용자만. 정의하지 않은 경로는 전부 거절.
+- 글/마음 생성: 허용 필드만, 글자 수·줄바꿈 검사, uid = 요청자, 반응·신고 수 0, hidden=false, createdAt = 서버 시각, 같은 요청에서 `users/{uid}.lastWriteAt` 갱신(30초 이내면 거절).
+- 수정은 두 경우만: 반응 문서 생성/삭제와 함께 개수 ±1, 신고 문서 생성과 함께 reportCount+1 (3 이상이면 hidden=true 를 반드시 같이). 그 밖의 필드 변경은 거절.
+- 삭제는 글쓴이(uid 일치)만.
+- 카운터: 한 번에 0~50 증가만 (감소·임의 값 설정 불가), 방문자 수는 오늘 방문 기록을 처음 만들 때만 +1.
+
+### 규칙으로 막을 수 없는 것 (남은 위험)
+- **익명 계정을 계속 새로 만드는 도배**: 계정마다 30초 제한이라, 새 계정을 반복해서 만들면 우회돼요. → App Check(reCAPTCHA) 도입으로 완화 가능.
+- **금지어·개인정보 필터는 클라이언트에만** 있어요. 앱을 거치지 않고 직접 API 를 부르면 우회돼요. 규칙에는 복잡한 금지어 검사를 넣기 어려워서, 신고 3건 자동 숨김이 마지막 방어선이에요. → 나중에 Cloud Functions 로 서버 검사 추가 권장.
+- **신고 악용**: 여러 익명 계정으로 멀쩡한 글을 3번 신고하면 숨겨져요. 숨김 글을 되살리는 관리자 화면이 아직 없어요 (Firebase 콘솔에서 hidden 을 false 로 바꿀 수 있음).
+- **카운터 부풀리기**: 한 번에 최대 50씩이지만, 반복 호출로 숫자를 키울 수는 있어요. 날짜 문서 이름이 오늘인지도 규칙에서 검사하지 않아요.
+- 글자 수는 규칙의 문자열 길이 기준이라 이모지처럼 특수한 문자는 화면 글자 수와 조금 다를 수 있어요.
+
+### 사용량 (장면별 예상)
+| 시점 | 읽기 | 쓰기 |
+| --- | --- | --- |
+| 앱 시작 (하루 첫 방문) | 규칙 검사 1~2 | 2 (방문 기록 + 방문자 수) |
+| 아무 장면에 들어갈 때 | 2 (오늘 카운터 + 누적) | 0 |
+| 운동장 들어갈 때 | + 최대 12 (나눈 마음 구름, 없으면 1) | 0 |
+| 연구실 게시판 열기 | 게시판·정렬마다 최대 30 (1분 안에 다시 열면 0) | 0 |
+| 글 남기기 / 마음 나누기 | 규칙 검사 1~2 | 2 (글 + 도배 방지 문서) |
+| 반응 / 반응 취소 | 규칙 검사 2 | 2 (반응 문서 + 개수) |
+| 신고 | 0~1 (+규칙 검사) | 2 |
+| 업무 날리기·운동장 바퀴 | 0 | 모았다가 10초마다 최대 2 (날린 게 있을 때만) |
+- 실시간 구독(onSnapshot)은 쓰지 않아요. 한 사람이 연구실 게시판 3개를 모두 열어 보는 방문 한 번이 대략 읽기 100회 안팎이에요.
+- 무료 요금제(Spark)는 하루 읽기 5만·쓰기 2만 회예요. 한도를 넘거나 서버가 응답하지 않으면 앱은 혼자 보는 모드로 바뀌고(한도 초과는 10분, 그 밖의 오류는 45초 뒤 다시 시도), 화면은 멈추지 않아요.
+
+### 샤딩이 필요해지는 기준
+한 문서는 초당 1회 정도의 지속 쓰기가 안전한 한계예요. 지금은 활동 중인 사람마다 10초에 한 번만 `daily/{날짜}` 를 쓰므로, **동시에 업무를 날리거나 운동장을 도는 사람이 10명을 꾸준히 넘거나**, 쓰기가 "contention/aborted" 오류로 실패하기 시작하면 `daily/{날짜}/shards/{0~9}` 처럼 나눠 쓰고 읽을 때 합치세요.
+
+### 사용량이 늘면 할 일
+1. **App Check** 도입 (reCAPTCHA Enterprise) — 앱 밖에서의 호출·계정 반복 생성 도배 완화
+2. **읽기 캐시 강화** — 게시판 캐시 시간을 늘리고, 카운터는 장면 이동마다가 아니라 1~2분에 한 번만 읽기
+3. **요금제 변경** — 하루 한도를 자주 넘으면 Blaze(사용량 과금)로 바꾸고 예산 알림 설정
+4. **Cloud Functions** — 금지어·개인정보 서버 검사, 신고 알림, 숨김 글 관리
+
 ### 개발용: 시간대 강제로 바꾸기
 
 주소 뒤에 `?time=` 을 붙이면 돼요.
@@ -123,7 +222,8 @@ npm run preview
 ### 개발용: 날짜 바꾸기 / 기록 초기화
 
 - `?date=2026-11-02`: 오늘 날짜를 그 날짜로 강제 (하루 한 번 간식 제한 확인용)
-- `?reset=1`: 도감·간식 기록, 교실 서류 더미(내가 올린 서류 포함), 날린 업무 카운터, 칭호, 연구실 데이터(내 글·반응·첫 안내), 오늘 마음을 띄웠는지 값을 지움 (바퀴 수는 그대로, 지운 뒤 주소에서 `reset` 은 저절로 빠져요)
+- `?offline=1`: Firebase 를 쓰지 않는 혼자 보는 모드
+- `?reset=1`: 이 기기의 기록만 지움 — 도감·간식 기록, 교실 서류 더미(내가 올린 서류 포함), 날린 업무 카운터, 칭호, 연구실 데이터(내 글·반응·첫 안내), 오늘 마음을 띄웠는지 값을 지움 (바퀴 수는 그대로, 지운 뒤 주소에서 `reset` 은 저절로 빠져요)
 - 함께 쓸 수도 있어요: `?time=night&date=2026-11-02`
 
 ## 배포 (GitHub Pages)
@@ -152,7 +252,8 @@ BASE_PATH=/my-repo/ npm run build
 src/
   components/  3D 물체(하늘, 바닥, 나무, 가로등, 벤치, 캐릭터, 카메라)와 HUD
   scenes/      장면 조립 (Playground = 운동장, Office = 교무실, Classroom = 교실, Lab = 연구실)
-  services/    나중에 서버로 바꿀 수 있는 모듈 (counterService, boardService) + 글 검사(moderation)
+  services/    서버/로컬 데이터 모듈 (firebase, boardService, heartService, counterService) + 글 검사(moderation, mindSafety)
+tests/         Firestore 보안 규칙 테스트 (npm run test:rules)
   hooks/       내 캐릭터 상태·이동(playerStore), 바퀴 수 저장(lapStore), 시간대(useTimeOfDay)
   data/        공간 정의(scenes), NPC·대사, 간식, 업무 라벨·문구, 오늘의 한마디, 게시판 설정·시드 글, 금지어, 시간대 색, 배치·충돌 영역
 

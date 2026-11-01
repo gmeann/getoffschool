@@ -787,3 +787,51 @@ button.pill:active { transform: scale(0.94); }
 .crisis-card h2 { margin: 0 0 4px; font-size: 18px; }
 .crisis-card p { margin: 0; font-size: 15px; line-height: 1.6; word-break: keep-all; }
 .crisis-call { display: inline-flex; align-items: center; justify-content: center; margin-top: 8px; text-decoration: none; }
+
+/* ---------- 6단계: 공유 ---------- */
+.pill.offline-chip { height: 30px; padding: 0 12px; font-size: 12px; background: rgba(43, 37, 64, 0.62); color: #f4e6ff; }
+.laps-all { margin-left: 4px; font-size: 12px; opacity: 0.85; }
+.mini.ghost { background: transparent; border: 1px solid rgba(58, 47, 82, 0.2); color: rgba(58, 47, 82, 0.7); }
+.post-card.chalk .mini.ghost { border-color: rgba(255, 255, 255, 0.3); color: rgba(255, 255, 255, 0.75); }
+.sheet-notice {
+  position: absolute;
+  left: 50%;
+  bottom: 84px;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #3a2f52;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  max-width: calc(100% - 24px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: pop 0.2s ease-out;
+}
+.mind-share-notice { margin: 0; padding: 9px 12px; border-radius: 12px; background: #e6f4ff; color: #1f5a8a; font-size: 13px; font-weight: 700; word-break: keep-all; }
+.mind-share { margin-top: -2px; }
+
+.heart-sheet {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: min(520px, 100%);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 16px calc(env(safe-area-inset-bottom) + 14px);
+  border-radius: 24px 24px 0 0;
+  background: linear-gradient(180deg, #fff1f4 0%, #fff9f1 100%);
+  color: #3a2f52;
+  box-shadow: 0 -10px 40px rgba(20, 12, 40, 0.35);
+  animation: sheet-in 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.05);
+}
+.heart-sheet .sheet-head { margin-bottom: 0; }
+.heart-text { margin: 0; padding: 14px 16px; border-radius: 18px; background: #fff; font-family: 'Gaegu', 'Pretendard Variable', sans-serif; font-size: 21px; line-height: 1.45; word-break: keep-all; overflow-wrap: anywhere; box-shadow: 0 3px 12px rgba(255, 180, 190, 0.3); }
+.heart-reactions { display: flex; flex-wrap: wrap; gap: 8px; }
+.react-btn.big { height: 38px; padding: 0 14px; font-size: 14px; }
+.heart-hint { margin: -4px 2px 0; font-size: 12px; opacity: 0.6; }
+.heart-actions { display: flex; justify-content: flex-end; }
