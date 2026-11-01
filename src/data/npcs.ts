@@ -16,6 +16,8 @@ export type NpcDef = {
   talkFrom: { x: number; z: number }
   lines: string[]
   greetings: string[]
+  /** 오늘 마음을 띄운 날 섞어 말하는 대사 (5개) */
+  mindLines: string[]
   /** 간식을 줄 때 한마디 */
   giveLine: (snack: string) => string
 }
@@ -72,6 +74,13 @@ export const NPCS: NpcDef[] = [
       '무슨 일 있으면 저한테 말씀 주세요. 내선 0번이요!',
     ],
     greetings: ['안녕하세요! 오늘도 반가워요.', '어서 오세요~ 고생하셨어요.', '네, 안녕하세요! 꾸벅.'],
+    mindLines: [
+      '오늘 많이 힘들었죠. 따뜻한 거 한 잔 드세요.',
+      '얼굴이 조금 지쳐 보여요. 잠깐 앉았다 가세요.',
+      '힘든 날엔 단 게 최고예요. 이거 드세요.',
+      '오늘은 일찍 들어가서 푹 쉬세요. 제가 다 챙겨 둘게요.',
+      '무슨 일 있으면 언제든 말 걸어 주세요. 여기 있을게요.',
+    ],
     giveLine: (s) => `이거 하나 드세요. ${s}예요! 몰래 드리는 거예요.`,
   },
   {
@@ -111,6 +120,13 @@ export const NPCS: NpcDef[] = [
       '잘하고 있다는 말, 오늘은 제가 먼저 할게요. 잘하고 있어요!',
     ],
     greetings: ['아, 선생님! 수고 많으셨어요.', '네~ 안녕하세요. 차 한잔하실래요?', '반가워요. 오늘도 고생했어요.'],
+    mindLines: [
+      '오늘 같은 날은 서류 말고 선생님부터 챙기세요.',
+      '마음이 무거운 날도 있죠. 저도 그래요.',
+      '차 한 잔 우려 드릴게요. 천천히 마셔요.',
+      '내일 일은 내일 같이 고민해요. 오늘은 여기까지.',
+      '선생님 잘하고 있어요. 진짜로요.',
+    ],
     giveLine: (s) => `서랍에 ${s} 있었어요. 회의 버틴 상이에요.`,
   },
   {
@@ -151,6 +167,13 @@ export const NPCS: NpcDef[] = [
       '선생님이 있어서 든든합니다. 조심히 가세요.',
     ],
     greetings: ['어이쿠, 선생님. 반갑습니다.', '네, 안녕하세요. 오늘도 고생 많으셨어요.', '허허, 인사 잘 받았어요.'],
+    mindLines: [
+      '오늘 많이 지쳤을 텐데, 와 줘서 고마워요.',
+      '힘든 마음은 혼자 두지 말아요. 제 방 문은 늘 열려 있어요.',
+      '선생님 건강이 먼저예요. 오늘은 푹 쉬어요.',
+      '수고 많았어요. 정말로요.',
+      '따뜻한 저녁 꼭 챙겨 드세요. 그게 오늘의 숙제예요.',
+    ],
     giveLine: (s) => `제 서랍 속 ${s}, 아껴 둔 거예요. 하나 드세요.`,
   },
 ]
@@ -160,8 +183,9 @@ export const NPC_BY_ID = Object.fromEntries(NPCS.map((n) => [n.id, n])) as Recor
 const lastLine: Partial<Record<NpcId, string>> = {}
 
 /** 무작위 대사 (같은 NPC의 직전 대사와 겹치지 않게) */
-export function pickNpcLine(id: NpcId): string {
-  const pool = [...NPC_BY_ID[id].lines, ...COMMON_LINES]
+export function pickNpcLine(id: NpcId, mindToday = false): string {
+  // 오늘 마음을 띄운 날에는 위로 대사를 절반쯤 섞음
+  const pool = mindToday && Math.random() < 0.5 ? NPC_BY_ID[id].mindLines : [...NPC_BY_ID[id].lines, ...COMMON_LINES]
   let line = pool[Math.floor(Math.random() * pool.length)]
   while (line === lastLine[id]) line = pool[Math.floor(Math.random() * pool.length)]
   lastLine[id] = line

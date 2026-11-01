@@ -32,6 +32,8 @@ export const player = {
   position: new THREE.Vector3(PLAYER_START.x, 0, PLAYER_START.z),
   yaw: 0,
   target: null as THREE.Vector3 | null,
+  /** 마음 띄우기 카메라: 0 보통, 1 입력 중(가까이), 2 구름 바라보기 */
+  mindView: 0 as 0 | 1 | 2,
   /** 가구를 돌아가기 위한 중간 경유점 (목표 지점 전까지) */
   path: [] as { x: number; z: number }[],
   mode: 'idle' as Mode,
@@ -68,6 +70,7 @@ export function resetForScene(spawn: Spawn) {
   player.interact = null
   player.seat = null
   player.path = []
+  player.mindView = 0
   emitUi()
 }
 

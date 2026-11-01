@@ -26,6 +26,8 @@ export function CameraRig({ scale: sceneScale = 1 }: { scale?: number }) {
   const zoomTarget = useRef(1)
   const sit = useRef(0)
   const sky = useRef(0)
+  const mind = useRef(0)
+  const mindUp = useRef(0)
   const focus = useRef(new THREE.Vector3())
   const camPos = useRef(new THREE.Vector3())
   const look = useRef(new THREE.Vector3())
@@ -55,9 +57,12 @@ export function CameraRig({ scale: sceneScale = 1 }: { scale?: number }) {
     sit.current = THREE.MathUtils.damp(sit.current, player.pose === 'sit' ? 1 : 0, 2.5, dt)
     // 하늘 보기는 천천히
     sky.current = THREE.MathUtils.damp(sky.current, player.skyLook ? 1 : 0, 1.2, dt)
+    // 마음 띄우기: 입력 중에는 살짝 가까이, 구름이 떠오를 때는 천천히 하늘 쪽으로
+    mind.current = THREE.MathUtils.damp(mind.current, player.mindView > 0 ? 1 : 0, 2.5, dt)
+    mindUp.current = THREE.MathUtils.damp(mindUp.current, player.mindView === 2 ? 1 : 0, 0.9, dt)
 
-    const s = THREE.MathUtils.smoothstep(sky.current, 0, 1)
-    const scale = zoom.current * aspectScale * THREE.MathUtils.lerp(1, SIT_SCALE, sit.current)
+    const s = Math.max(THREE.MathUtils.smoothstep(sky.current, 0, 1), 0.55 * THREE.MathUtils.smoothstep(mindUp.current, 0, 1))
+    const scale = zoom.current * aspectScale * THREE.MathUtils.lerp(1, SIT_SCALE, sit.current) * THREE.MathUtils.lerp(1, 0.8, mind.current)
     const lookH = THREE.MathUtils.lerp(LOOK_HEIGHT, SIT_LOOK_HEIGHT, sit.current)
 
     // 기본 위치/시선

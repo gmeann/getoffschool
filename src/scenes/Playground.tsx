@@ -16,12 +16,21 @@ import { setWorld, updatePlayer, walkTo } from '../hooks/playerStore'
 import { SchoolBuilding } from '../components/SchoolBuilding'
 import { PLAYGROUND_WORLD } from '../data/world'
 import type { Door } from '../data/scenes'
+import { MindCloud } from '../components/MindCloud'
 import { useTimeOfDay } from '../hooks/useTimeOfDay'
 
-type Props = { name: string; bubble: string | null; labelLayer: RefObject<HTMLDivElement>; onDoor: (door: Door) => void }
+type Props = {
+  name: string
+  bubble: string | null
+  labelLayer: RefObject<HTMLDivElement>
+  onDoor: (door: Door) => void
+  /** 마음 띄우기 구름 (글은 메모리에만, 끝나면 onCloudDone 에서 비움) */
+  cloud?: { key: number; text: string; origin: THREE.Vector3 } | null
+  onCloudDone?: () => void
+}
 
 /** 운동장 장면 */
-export function Playground({ name, bubble, labelLayer, onDoor }: Props) {
+export function Playground({ name, bubble, labelLayer, onDoor, cloud, onCloudDone }: Props) {
   const ring = useRef<TargetRingHandle>(null)
   const sky = useTimeOfDay()
 
@@ -56,6 +65,9 @@ export function Playground({ name, bubble, labelLayer, onDoor }: Props) {
       <TargetRing ref={ring} />
       <ShadowTeachers myName={name} labelLayer={labelLayer} />
       <Character name={name} bubble={bubble} labelLayer={labelLayer} />
+      {cloud && onCloudDone && (
+        <MindCloud key={cloud.key} text={cloud.text} origin={cloud.origin} onDone={onCloudDone} labelLayer={labelLayer} />
+      )}
       <CameraRig />
     </>
   )

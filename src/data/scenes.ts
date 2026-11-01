@@ -7,7 +7,7 @@
 export type SceneId = 'playground' | 'office' | 'classroom' | 'lab'
 
 /** 하단 알약 버튼 종류 */
-export type ActionId = 'run' | 'sit' | 'sky' | 'book' | 'greet' | 'fling' | 'method' | 'add' | 'memo' | 'fridge' | 'chalk'
+export type ActionId = 'run' | 'sit' | 'sky' | 'book' | 'greet' | 'fling' | 'method' | 'add' | 'memo' | 'fridge' | 'chalk' | 'mind'
 
 export type Spawn = { x: number; z: number; yaw: number }
 

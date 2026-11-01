@@ -8,6 +8,12 @@ import { BoardPanel } from './components/BoardPanel'
 import { LAB_OBJECTS } from './data/lab'
 import type { BoardId } from './data/boards'
 import { markLabGuideSeen, shouldShowLabGuide } from './hooks/onboarding'
+import { MindCompose } from './components/MindCompose'
+import { CrisisDialog } from './components/CrisisDialog'
+import { MIND_TEXT } from './data/mindFloat'
+import { hasCrisisSignal } from './services/mindSafety'
+import { floatedToday, markFloatedToday } from './hooks/mindStore'
+import * as THREE from 'three'
 import { MethodPicker } from './components/MethodPicker'
 import { AddPaper } from './components/AddPaper'
 import { pileTop } from './components/PaperPile'
@@ -60,6 +66,10 @@ export default function App() {
   const [addOpen, setAddOpen] = useState(false)
   const [boardOpen, setBoardOpen] = useState<BoardId | null>(null)
   const [labGuide, setLabGuide] = useState(false)
+  // 마음 띄우기: 글은 이 상태(메모리)에만 있고, 연출이 끝나면 바로 비움. 저장·전송·로그 없음
+  const [mindOpen, setMindOpen] = useState(false)
+  const [cloud, setCloud] = useState<{ key: number; text: string; origin: THREE.Vector3; crisis: boolean } | null>(null)
+  const [crisisOpen, setCrisisOpen] = useState(false)
   const effectsRef = useRef<TaskEffectsHandle | null>(null)
   const [floatSnack, setFloatSnack] = useState<{ snack: Snack; key: number } | null>(null)
   const [npcBubbles, setNpcBubbles] = useState<Partial<Record<NpcId, string>>>({})
@@ -117,6 +127,10 @@ export default function App() {
       setPickerOpen(false)
       setAddOpen(false)
       setBoardOpen(null)
+      setMindOpen(false)
+      setCloud(null)
+      setCrisisOpen(false)
+      player.mindView = 0
       setFading(true)
       window.setTimeout(() => {
         // 화면이 완전히 어두워진 뒤 장면 교체 (이전 장면은 언마운트되며 자원 정리)
@@ -152,7 +166,7 @@ export default function App() {
 
   // ---------- NPC 대화 ----------
   const openDialog = useCallback((npc: NpcDef) => {
-    const text = receivedToday(npc.id) ? pickFrom(ALREADY_LINES) : pickNpcLine(npc.id)
+    const text = receivedToday(npc.id) ? pickFrom(ALREADY_LINES) : pickNpcLine(npc.id, floatedToday())
     setDialog({ npc, text, gift: null })
   }, [])
 
@@ -220,6 +234,37 @@ export default function App() {
     if (sceneId === 'lab' && shouldShowLabGuide()) setLabGuide(true)
   }, [sceneId])
 
+  // ---------- 마음 띄우기 ----------
+  const openMind = useCallback(() => {
+    // 앉아 있을 때만, 이전 구름이 다 사라진 뒤에만 열림
+    if (cloud || player.mode !== 'sit') return
+    player.mindView = 1
+    setMindOpen(true)
+  }, [cloud])
+
+  const closeMind = useCallback(() => {
+    setMindOpen(false)
+    player.mindView = 0
+  }, [])
+
+  const sendMind = useCallback((text: string) => {
+    setMindOpen(false)
+    const crisis = hasCrisisSignal(text)
+    const origin = new THREE.Vector3(player.position.x, 2.45 + player.sitLift, player.position.z)
+    setCloud({ key: Date.now(), text, origin, crisis })
+    player.mindView = 2
+    // 저장하는 건 "오늘 띄웠다"는 날짜 하나뿐
+    markFloatedToday()
+  }, [])
+
+  const cloudDone = useCallback(() => {
+    const crisis = cloud?.crisis ?? false
+    setCloud(null) // 글 내용을 화면·메모리에서 지움
+    player.mindView = 0
+    if (crisis) setCrisisOpen(true)
+    else showBubble(pickFrom(MIND_TEXT.doneLines), 3200)
+  }, [cloud, showBubble])
+
   // ---------- 업무 날리기 ----------
   const fling = useCallback(() => {
     const before = getTaskUi().remaining
@@ -258,13 +303,15 @@ export default function App() {
         case 'fridge':
         case 'chalk':
           return openBoard(action)
+        case 'mind':
+          return openMind()
         case 'sound':
           return showToast(`소리는 ${SOON}`)
         default:
           return showToast(SOON)
       }
     },
-    [showToast, greet, fling, openBoard],
+    [showToast, greet, fling, openBoard, openMind],
   )
 
   const sceneProps = { name, bubble, labelLayer, onDoor: handleDoor }
@@ -285,7 +332,14 @@ export default function App() {
       >
         <Suspense fallback={null}>
           {/* 한 번에 한 장면만 불러옴. key 가 바뀌면 이전 장면은 통째로 정리됨 */}
-          {sceneId === 'playground' && <Playground key="playground" {...sceneProps} />}
+          {sceneId === 'playground' && (
+            <Playground
+              key="playground"
+              {...sceneProps}
+              cloud={cloud ? { key: cloud.key, text: cloud.text, origin: cloud.origin } : null}
+              onCloudDone={cloudDone}
+            />
+          )}
           {sceneId === 'classroom' && (
             <Classroom
               key="classroom"
@@ -313,7 +367,7 @@ export default function App() {
         player={playerUi}
         laps={lapUi.laps}
         titles={lapUi.titles}
-        hideBottom={!!dialog || !!boardOpen}
+        hideBottom={!!dialog || !!boardOpen || mindOpen || !!cloud}
         counter={counter}
         remaining={taskUi.remaining}
         method={taskUi.method}
@@ -361,6 +415,11 @@ export default function App() {
           onClose={() => setAddOpen(false)}
         />
       )}
+
+      {/* 구름이 떠오르는 동안 3D 클릭 이동 막기 */}
+      {cloud && <div className="input-blocker" aria-hidden />}
+      {mindOpen && <MindCompose onSend={sendMind} onClose={closeMind} />}
+      {crisisOpen && <CrisisDialog onClose={() => setCrisisOpen(false)} />}
 
       {boardOpen && <BoardPanel key={boardOpen} board={boardOpen} myName={name} onClose={() => setBoardOpen(null)} />}
 

@@ -5,6 +5,7 @@ import { SCENES, SCENE_ORDER, type ActionId, type SceneId } from '../data/scenes
 import type { PlayerUi } from '../hooks/playerStore'
 import { METHODS, type MethodChoice } from '../data/tasks'
 import type { CounterSnapshot } from '../services/counterService'
+import { MIND_TEXT } from '../data/mindFloat'
 
 export type HudAction = 'exit' | 'sound' | 'settings' | ActionId
 
@@ -42,9 +43,11 @@ export function Hud({ sceneId, onAction, onScene, toast, player, laps, titles, h
     memo: { active: false, emoji: '📌', label: '메모보드' },
     fridge: { active: false, emoji: '🧊', label: '냉장고' },
     chalk: { active: false, emoji: '🖍️', label: '칠판' },
+    mind: { active: false, emoji: MIND_TEXT.buttonEmoji, label: MIND_TEXT.button },
   }
   const flingDone = remaining <= 0
-  const actions = SCENES[sceneId].actions
+  // 운동장에서 앉아 있으면: 마음 띄우기 + 일어나기
+  const actions: ActionId[] = sceneId === 'playground' && player.mode === 'sit' ? ['mind', 'sit'] : SCENES[sceneId].actions
 
   return (
     <div className="hud">
