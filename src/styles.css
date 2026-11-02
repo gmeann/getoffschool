@@ -110,6 +110,11 @@ button.pill:active { transform: scale(0.94); }
   .hud-right { gap: 6px; }
   .hud-right-main { flex-direction: column; align-items: flex-end; gap: 6px; }
   .hud-right-main .icons { order: -1; }
+  /* 왼쪽 제목과 오른쪽 정보가 함께 화면 폭을 넘지 않게: '모두 N바퀴'는 바퀴 칸 안에서 아랫줄로 */
+  .hud-left { min-width: 0; flex: 0 1 auto; }
+  .hud-right { min-width: 0; flex: 0 1 auto; }
+  .pill.laps { height: auto; min-height: 36px; padding: 6px 12px; border-radius: 16px; flex-wrap: wrap; justify-content: flex-end; row-gap: 0; line-height: 1.35; }
+  .laps-all { flex-basis: 100%; text-align: right; margin-left: 0; }
   .pill.badge { height: 30px; font-size: 12px; }
   .pill.action { height: 44px; padding: 0 16px; font-size: 14px; }
   .hud-bottom { gap: 8px; }
