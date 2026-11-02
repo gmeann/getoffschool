@@ -8,8 +8,9 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "dev:emu": "VITE_USE_EMULATOR=1 vite",
-    "emu": "firebase emulators:start --only auth,firestore --project demo-getoffschool",
-    "test:rules": "firebase emulators:exec --only firestore --project demo-getoffschool \"node --test --test-concurrency=1 tests/rules.test.mjs\""
+    "emu": "firebase emulators:start --only auth,firestore,database --project demo-getoffschool",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-getoffschool \"node --test --test-concurrency=1 tests/rules.test.mjs\"",
+    "test:db": "firebase emulators:exec --only database --project demo-getoffschool \"node --test --test-concurrency=1 tests/database.rules.test.mjs\""
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

@@ -20,6 +20,8 @@ type Props = {
   hideBottom: boolean
   /** 교실: 날린 업무 카운터, 남은 서류, 고른 방식 */
   counter: CounterSnapshot
+  /** 지금 접속한 사람 수 (실시간 연결이 없으면 0 → 표시 안 함) */
+  onlineNow: number
   remaining: number
   method: MethodChoice
   /** 서버 연결이 안 되면 '혼자 보는 모드' 안내 */
@@ -29,7 +31,7 @@ type Props = {
 }
 
 /** HTML 오버레이 UI (알약형 반투명 버튼) */
-export function Hud({ sceneId, onAction, onScene, toast, player, laps, titles, hideBottom, counter, remaining, method, offline, soundOn }: Props) {
+export function Hud({ sceneId, onAction, onScene, toast, player, laps, titles, hideBottom, counter, onlineNow, remaining, method, offline, soundOn }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const running = player.mode === 'run'
   const sitting = player.mode === 'sit' || player.mode === 'toSeat'
@@ -121,9 +123,18 @@ export function Hud({ sceneId, onAction, onScene, toast, player, laps, titles, h
 
         <div className="hud-right">
           <div className="hud-right-main">
-            <div className="pill count" aria-label={`오늘 ${counter.visitors}명 다녀감`}>
+            <div
+              className="pill count"
+              aria-label={`오늘 ${counter.visitors}명 다녀감${onlineNow > 0 ? `, 지금 ${onlineNow}명 접속 중` : ''}`}
+            >
               <PersonIcon />
               오늘 {counter.visitors}명
+              {onlineNow > 0 && (
+                <span className="online-now">
+                  <span className="real-dot" aria-hidden />
+                  지금 {onlineNow}명
+                </span>
+              )}
             </div>
             <div className="pill laps" aria-label={`오늘 나는 ${laps}바퀴`}>
               👟 오늘 나는 <strong>{laps.toFixed(1)}</strong>바퀴

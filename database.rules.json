@@ -1,0 +1,29 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "online": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.isString() && newData.val().matches(/^(playground|office|classroom|lab)$/)"
+      }
+    },
+    "presence": {
+      "$scene": {
+        ".read": "auth != null && $scene.matches(/^(playground|office|classroom|lab)$/)",
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid && $scene.matches(/^(playground|office|classroom|lab)$/)",
+          ".validate": "newData.hasChildren(['i', 'x', 'z', 'r', 'p', 'l'])",
+          "i": { ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= -1 && newData.val() < 100" },
+          "x": { ".validate": "newData.isNumber() && newData.val() >= -80 && newData.val() <= 80" },
+          "z": { ".validate": "newData.isNumber() && newData.val() >= -80 && newData.val() <= 80" },
+          "r": { ".validate": "newData.isNumber() && newData.val() >= -100 && newData.val() <= 100" },
+          "p": { ".validate": "newData.isString() && newData.val().matches(/^(stand|walk|run|sit|bow)$/)" },
+          "l": { ".validate": "newData.isNumber() && newData.val() >= -1 && newData.val() <= 1" },
+          "$other": { ".validate": false }
+        }
+      }
+    }
+  }
+}

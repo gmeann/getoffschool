@@ -236,6 +236,32 @@ firebase deploy --only firestore --project getoffschool
 - 되살린 글은 신고 수가 0이 되지만, 이전에 신고한 사람의 신고 기록은 남아서 같은 사람이 다시 신고할 수는 없어요.
 - 규칙을 고쳤으니 `firebase deploy --only firestore --project getoffschool` 로 다시 배포해야 해요.
 
+## 8단계: 실시간 함께 있기 (Realtime Database)
+
+같은 공간(운동장·교무실·교실·연구실)에 접속한 선생님의 캐릭터가 실시간으로 보여요.
+
+- 실제 사람의 이름표에는 **초록 점**이 붙어요 (산책하는 선생님 NPC 와 구분). 상단에 **"지금 N명"**(학교 전체 접속 인원)이 보여요.
+- 걷기·뛰기·앉기·인사하기 동작이 그대로 보여요. 채팅은 없어요.
+- 보내는 것: 이름표 번호(목록 순서, 자유 글자 없음), 위치, 방향, 자세뿐. 움직일 때만 0.5초마다 보내고, 멈춰 있으면 보내지 않아요.
+- 탭을 닫거나 네트워크가 끊기면 서버가 내 기록을 자동으로 지워요. 화면을 30초 넘게 가리면 연결을 잠시 끊어요.
+- 코드: `src/services/presenceService.ts`(주고받기), `src/components/RemotePlayers.tsx`(그리기)
+
+### 설정
+1. Firebase 콘솔 → **Realtime Database** → 데이터베이스 만들기 (위치: **싱가포르 asia-southeast1**, 한국에서 가장 가까움. 서울은 없음) → 잠금 모드
+2. **규칙** 탭에 `database.rules.json` 내용을 붙여 넣고 **게시**
+3. GitHub 레포 Variables 에 `VITE_FIREBASE_DATABASE_URL` 추가 (값: Realtime Database 화면 위쪽 주소) → Actions 에서 다시 배포
+- 주소가 비어 있으면 이 기능만 꺼지고 나머지는 그대로 동작해요.
+
+### 무료 요금제(Spark) 한도
+- **동시 접속 100명**까지. 넘으면 그 뒤에 들어온 사람은 다른 사람이 안 보이고 혼자 걷는 것처럼 보여요 (앱은 계속 동작).
+- 다운로드 월 10GB. 30명이 같은 공간에서 계속 걸어 다니면 대략 하루 몇 시간 정도 버틸 수 있는 양이에요. 대부분 멈춰 있거나 앉아 있으면 훨씬 여유 있어요.
+- 한 공간에 그리는 다른 사람은 최대 30명 (`MAX_OTHERS`).
+
+### 테스트
+```bash
+npm run test:db      # Realtime Database 보안 규칙 테스트 8개 (에뮬레이터)
+```
+
 ### 개발용: 시간대 강제로 바꾸기
 
 주소 뒤에 `?time=` 을 붙이면 돼요.

@@ -37,6 +37,8 @@ import { DialogSheet } from './components/DialogSheet'
 import { SnackBook } from './components/SnackBook'
 import { SnackIcon } from './components/SnackIcon'
 import { pickRandomNickname } from './data/nicknames'
+import { RemotePlayers } from './components/RemotePlayers'
+import { getPresence, setPresenceName, setPresenceScene, subscribePresence } from './services/presenceService'
 import { SCENES, doorFront, type Door, type SceneId } from './data/scenes'
 import { ALREADY_LINES, NPCS, NPC_BY_ID, pickFrom, pickNpcLine, type NpcDef, type NpcId } from './data/npcs'
 import type { Snack } from './data/snacks'
@@ -105,6 +107,7 @@ export default function App() {
   const snackUi = useSyncExternalStore(subscribeSnacks, getSnackUi)
   const taskUi = useSyncExternalStore(subscribeTasks, getTaskUi)
   const counter = useSyncExternalStore(counterService.subscribe, counterService.getSnapshot)
+  const presence = useSyncExternalStore(subscribePresence, getPresence)
 
   const showBubble = useCallback((text: string, ms = 1800) => {
     setBubble(text)
@@ -266,6 +269,12 @@ export default function App() {
     void getFirebase()
     counterService.start()
   }, [])
+
+  // 실시간 함께 있기: 지금 공간과 이름표를 알려 줌 (설정이 없으면 아무 일도 안 함)
+  useEffect(() => setPresenceName(name), [name])
+  useEffect(() => {
+    void setPresenceScene(sceneId)
+  }, [sceneId])
 
   // 소리 분위기: 장면·시간대에 맞춤 (1분마다 시간대 확인)
   useEffect(() => {
@@ -481,6 +490,7 @@ export default function App() {
           {sceneId === 'office' && (
             <Office key="office" {...sceneProps} onNpc={handleNpc} npcBubbles={npcBubbles} npcBows={npcBows} />
           )}
+          <RemotePlayers key={`remote-${sceneId}`} labelLayer={labelLayer} />
         </Suspense>
       </Canvas>
       <div ref={labelLayer} className="label-layer" />
@@ -495,6 +505,7 @@ export default function App() {
         titles={lapUi.titles}
         hideBottom={!!dialog || !!boardOpen || mindOpen || !!cloud || !!heartOpen}
         counter={counter}
+        onlineNow={presence.live ? presence.onlineCount : 0}
         remaining={taskUi.remaining}
         method={taskUi.method}
         offline={netStatus === 'offline'}

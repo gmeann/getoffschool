@@ -906,3 +906,9 @@ button.pill:active { transform: scale(0.94); }
 .stat-label { font-size: 12px; opacity: 0.7; }
 .stat-card strong { font-size: 22px; color: #e08a3a; }
 .stat-card small { font-size: 12px; margin-left: 2px; color: #3a2f52; opacity: 0.6; }
+
+/* ---------- 8단계: 실시간 함께 있기 ---------- */
+/* 실제로 접속한 선생님 이름표: 초록 점으로 산책하는 선생님(NPC)과 구분 */
+.nametag.real { background: rgba(43, 37, 64, 0.7); border-color: rgba(143, 224, 168, 0.55); font-weight: 600; }
+.real-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #6fdc8c; box-shadow: 0 0 0 2px rgba(111, 220, 140, 0.25); flex-shrink: 0; }
+.online-now { display: inline-flex; align-items: center; gap: 5px; margin-left: 6px; padding-left: 8px; border-left: 1px solid rgba(255, 255, 255, 0.25); }
