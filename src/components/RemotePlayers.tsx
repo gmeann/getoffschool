@@ -1,5 +1,5 @@
 import { useMemo, useRef, useSyncExternalStore, type RefObject } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { getPresence, remotePlayers, subscribePresence } from '../services/presenceService'
@@ -39,10 +39,18 @@ function dampAngle(a: number, b: number, lambda: number, dt: number) {
   return a + d * (1 - Math.exp(-lambda * dt))
 }
 
-function RemotePlayer({ uid, labelLayer }: { uid: string; labelLayer: RefObject<HTMLDivElement> }) {
+type Props = { uid: string; labelLayer: RefObject<HTMLDivElement>; onSelect: (uid: string) => void }
+
+const hoverCursor = {
+  onPointerOver: () => (document.body.style.cursor = 'pointer'),
+  onPointerOut: () => (document.body.style.cursor = ''),
+}
+
+function RemotePlayer({ uid, labelLayer, onSelect }: Props) {
   const root = useRef<THREE.Group>(null)
   const tag = useRef<THREE.Group>(null)
   const nameEl = useRef<HTMLSpanElement>(null)
+  const bubbleEl = useRef<HTMLDivElement>(null)
   const refs = useBodyRefs()
   const anim = useRef(newAnim())
   const look = useMemo(() => lookFor(uid), [uid])
@@ -72,14 +80,36 @@ function RemotePlayer({ uid, labelLayer }: { uid: string; labelLayer: RefObject<
     animateBody(refs, anim.current, r.pose, dt, 1, r.lift)
     if (tag.current) tag.current.position.y = 1.72 + anim.current.sit * r.lift
     if (nameEl.current && nameEl.current.textContent !== r.name) nameEl.current.textContent = r.name
+    // 머리 위 반응 (리렌더 없이 글자만 바꿈)
+    const b = bubbleEl.current
+    if (b) {
+      const text = r.reaction && Date.now() < r.reaction.until ? r.reaction.text : ''
+      if (b.textContent !== text) {
+        b.textContent = text
+        b.style.display = text ? '' : 'none'
+        b.classList.toggle('emoji', [...text].length <= 2)
+      }
+    }
   })
+
+  const click = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation()
+    onSelect(uid)
+  }
 
   return (
     <group ref={root}>
-      <CharacterModel refs={refs} look={look} />
+      <group onClick={click} {...hoverCursor}>
+        <CharacterModel refs={refs} look={look} />
+        {/* 누르기 쉬운 투명 영역 */}
+        <mesh position-y={0.8} visible={false}>
+          <cylinderGeometry args={[0.55, 0.55, 1.7, 8]} />
+        </mesh>
+      </group>
       <group ref={tag} position-y={1.72}>
         <Html portal={labelLayer} center zIndexRange={[9, 0]} style={{ pointerEvents: 'none' }}>
           <div className="tag-stack">
+            <div ref={bubbleEl} className="speech other react" style={{ display: 'none' }} />
             <div className="nametag real">
               <span className="real-dot" aria-hidden />
               <span ref={nameEl}>{remotePlayers.get(uid)?.name ?? '선생님'}</span>
@@ -92,12 +122,12 @@ function RemotePlayer({ uid, labelLayer }: { uid: string; labelLayer: RefObject<
 }
 
 /** 같은 공간에 접속해 있는 다른 선생님들 (실제 사람) */
-export function RemotePlayers({ labelLayer }: { labelLayer: RefObject<HTMLDivElement> }) {
+export function RemotePlayers({ labelLayer, onSelect }: { labelLayer: RefObject<HTMLDivElement>; onSelect: (uid: string) => void }) {
   const { others } = useSyncExternalStore(subscribePresence, getPresence)
   return (
     <>
       {others.map((uid) => (
-        <RemotePlayer key={uid} uid={uid} labelLayer={labelLayer} />
+        <RemotePlayer key={uid} uid={uid} labelLayer={labelLayer} onSelect={onSelect} />
       ))}
     </>
   )

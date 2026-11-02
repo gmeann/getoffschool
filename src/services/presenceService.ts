@@ -6,11 +6,14 @@
  * - 접속이 끊기면 서버가 onDisconnect 로 내 기록을 지움 (탭 닫기, 네트워크 끊김 모두)
  * - 화면을 30초 넘게 가리면 연결을 잠시 끊어 동시 접속 한도(무료 100명)를 아낌
  * - 설정(VITE_FIREBASE_DATABASE_URL)이 없거나 Firebase 연결에 실패하면 아무것도 하지 않음 (혼자 보는 모드)
- * - 위치·자세 말고는 아무것도 보내지 않음. 글, 기기 정보, 분석 값 없음
+ * - 상호작용(9단계): e/s = 반응 번호/보낸 횟수, g/gs/gk = 인사한 상대 uid/횟수/종류(0 인사, 1 맞인사)
+ *   반응·인사 모두 정해진 번호만 보냄 (자유 글자 없음). 받는 쪽은 '횟수'가 바뀔 때만 한 번 보여 줌
+ * - 위치·자세·반응 번호 말고는 아무것도 보내지 않음. 글, 기기 정보, 분석 값 없음
  */
 import type { Database, DatabaseReference, OnDisconnect } from 'firebase/database'
 import type { SceneId } from '../data/scenes'
 import { NICKNAMES } from '../data/nicknames'
+import { GREET_COOLDOWN_MS, REACTION_COOLDOWN_MS, REACTION_MS, reactionText } from '../data/reactions'
 import { player, type Pose } from '../hooks/playerStore'
 import { getFirebase, OFFLINE_FORCED, USE_EMULATOR } from './firebase'
 
@@ -24,7 +27,11 @@ export type RemotePlayer = {
   yaw: number
   pose: Pose
   lift: number
+  /** 머리 위 반응 (until 까지 보임) */
+  reaction: { text: string; until: number } | null
 }
+
+export type GreetEvent = { from: string; name: string; kind: 0 | 1 }
 
 export type PresenceSnapshot = {
   /** 연결되어 실시간 정보를 보여 주는 중인지 */
@@ -80,6 +87,16 @@ let unsubScene: (() => void) | null = null
 let last: { x: number; z: number; r: number; p: Pose; l: number; i: number; at: number } | null = null
 let timer = 0
 
+// 9단계: 반응·인사 (보낸 횟수가 바뀌어야 상대 화면에 한 번 뜸)
+let myReact = { e: -1, s: 0 }
+let myGreet = { g: '', gs: 0, gk: 0 as 0 | 1 }
+let dirty = false
+let lastReactAt = 0
+const lastGreetTo = new Map<string, number>()
+/** 상대별로 마지막으로 본 횟수 (처음 본 값은 지난 일이라 보여 주지 않음) */
+const seenSeq = new Map<string, { s: number; gs: number }>()
+const greetListeners = new Set<(e: GreetEvent) => void>()
+
 const round = (v: number, d = 2) => Math.round(v * 10 ** d) / 10 ** d
 /** 방향을 -π~π 로 (계속 돌면 값이 커질 수 있어서) */
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a))
@@ -92,6 +109,11 @@ function payload() {
     r: round(wrap(player.yaw)),
     p: player.pose,
     l: round(player.sitLift),
+    e: myReact.e,
+    s: myReact.s,
+    g: myGreet.g,
+    gs: myGreet.gs,
+    gk: myGreet.gk,
   }
 }
 
@@ -170,11 +192,12 @@ function tick() {
   if (!c || !connected || !myRef) return
   const p = payload()
   const now = Date.now()
-  const poseChanged = !last || last.p !== p.p || last.i !== p.i
+  const poseChanged = dirty || !last || last.p !== p.p || last.i !== p.i
   const moved = !last || Math.abs(last.x - p.x) > 0.03 || Math.abs(last.z - p.z) > 0.03 || Math.abs(last.r - p.r) > 0.08
   if (!poseChanged && !moved) return
   if (!poseChanged && last && now - last.at < SEND_MS) return
   last = { ...p, at: now }
+  dirty = false
   c.dbm.set(myRef, p).catch(() => undefined)
 }
 
@@ -195,6 +218,27 @@ function readRemote(uid: string, v: unknown): RemotePlayer | null {
     yaw: num('r') ?? 0,
     pose,
     lift: num('l') ?? 0.24,
+    reaction: null,
+  }
+}
+
+/** 상대 기록에서 새 반응·나에게 온 인사를 찾음 */
+function checkEvents(id: string, v: unknown, myUid: string, r: RemotePlayer) {
+  const o = (v ?? {}) as Record<string, unknown>
+  const s = typeof o.s === 'number' ? o.s : 0
+  const gs = typeof o.gs === 'number' ? o.gs : 0
+  const prev = seenSeq.get(id)
+  seenSeq.set(id, { s, gs })
+  const old = remotePlayers.get(id)
+  r.reaction = old?.reaction ?? null
+  if (!prev) return // 처음 본 사람: 예전 반응은 보여 주지 않음
+  if (s !== prev.s && typeof o.e === 'number') {
+    const text = reactionText(o.e)
+    if (text) r.reaction = { text, until: Date.now() + REACTION_MS }
+  }
+  if (gs !== prev.gs && o.g === myUid) {
+    const kind = o.gk === 1 ? 1 : 0
+    greetListeners.forEach((l) => l({ from: id, name: r.name, kind }))
   }
 }
 
@@ -216,6 +260,7 @@ export async function setPresenceScene(next: SceneId) {
     dbm.remove(old).catch(() => undefined)
   }
   remotePlayers.clear()
+  seenSeq.clear()
   emit({ others: [] })
 
   myRef = dbm.ref(db, `presence/${next}/${uid}`)
@@ -231,12 +276,18 @@ export async function setPresenceScene(next: SceneId) {
       s.forEach((child) => {
         const id = child.key
         if (!id || id === uid || seen.size >= MAX_OTHERS) return
-        const r = readRemote(id, child.val())
+        const v = child.val()
+        const r = readRemote(id, v)
         if (!r) return
+        checkEvents(id, v, uid, r)
         seen.add(id)
         remotePlayers.set(id, r)
       })
-      for (const id of [...remotePlayers.keys()]) if (!seen.has(id)) remotePlayers.delete(id)
+      for (const id of [...remotePlayers.keys()])
+        if (!seen.has(id)) {
+          remotePlayers.delete(id)
+          seenSeq.delete(id)
+        }
       const ids = [...seen].sort()
       const same = ids.length === snap.others.length && ids.every((id, k) => id === snap.others[k])
       if (!same) emit({ others: ids })
@@ -255,3 +306,35 @@ export async function setPresenceScene(next: SceneId) {
 export function setPresenceName(name: string) {
   nameIndex = (NICKNAMES as readonly string[]).indexOf(name)
 }
+
+/** 머리 위에 반응 띄우기 (같은 공간 모두에게). 너무 자주 누르면 false */
+export function sendReaction(id: number): boolean {
+  const now = Date.now()
+  if (now - lastReactAt < REACTION_COOLDOWN_MS || !reactionText(id)) return false
+  lastReactAt = now
+  myReact = { e: id, s: (myReact.s + 1) % 1_000_000 }
+  dirty = true
+  return true
+}
+
+/** 인사(0)·맞인사(1) 보내기. 같은 사람에게 너무 자주 인사하면 false */
+export function sendGreet(to: string, kind: 0 | 1): boolean {
+  const now = Date.now()
+  const key = `${to}:${kind}`
+  if (now - (lastGreetTo.get(key) ?? 0) < GREET_COOLDOWN_MS) return false
+  lastGreetTo.set(key, now)
+  myGreet = { g: to, gs: (myGreet.gs + 1) % 1_000_000, gk: kind }
+  dirty = true
+  return true
+}
+
+/** 나에게 온 인사 알림 받기 */
+export function onGreet(l: (e: GreetEvent) => void) {
+  greetListeners.add(l)
+  return () => {
+    greetListeners.delete(l)
+  }
+}
+
+// 개발 중 확인용 (배포 빌드에는 들어가지 않음)
+if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __remote: remotePlayers })

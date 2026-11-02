@@ -68,3 +68,13 @@ test('최상위·다른 경로 읽기·쓰기 거절', async () => {
   await assertFails(set(ref(db('alice'), 'other/alice'), 1))
   await assertFails(update(ref(db('alice'), '/'), { 'online/bob': 'lab' }))
 })
+
+test('반응·인사: 번호와 uid 만 허용', async () => {
+  const full = { ...ok, e: 101, s: 3, g: 'bob', gs: 2, gk: 1 }
+  await assertSucceeds(set(ref(db('alice'), 'presence/playground/alice'), full))
+  await assertSucceeds(set(ref(db('alice'), 'presence/playground/alice'), { ...full, g: '' }))
+  await assertFails(set(ref(db('alice'), 'presence/playground/alice'), { ...full, e: '수고했어요' }))
+  await assertFails(set(ref(db('alice'), 'presence/playground/alice'), { ...full, e: 999 }))
+  await assertFails(set(ref(db('alice'), 'presence/playground/alice'), { ...full, g: '아무 말이나 <b>' }))
+  await assertFails(set(ref(db('alice'), 'presence/playground/alice'), { ...full, gk: 2 }))
+})

@@ -38,7 +38,18 @@ import { SnackBook } from './components/SnackBook'
 import { SnackIcon } from './components/SnackIcon'
 import { pickRandomNickname } from './data/nicknames'
 import { RemotePlayers } from './components/RemotePlayers'
-import { getPresence, setPresenceName, setPresenceScene, subscribePresence } from './services/presenceService'
+import { ReactionPicker } from './components/ReactionPicker'
+import {
+  getPresence,
+  onGreet,
+  remotePlayers,
+  sendGreet,
+  sendReaction,
+  setPresenceName,
+  setPresenceScene,
+  subscribePresence,
+} from './services/presenceService'
+import { REACTION_MS, reactionText } from './data/reactions'
 import { SCENES, doorFront, type Door, type SceneId } from './data/scenes'
 import { ALREADY_LINES, NPCS, NPC_BY_ID, pickFrom, pickNpcLine, type NpcDef, type NpcId } from './data/npcs'
 import type { Snack } from './data/snacks'
@@ -90,6 +101,11 @@ export default function App() {
   const netStatus = useSyncExternalStore(subscribeNetStatus, getNetStatus)
   const settings = useSyncExternalStore(subscribeSettings, getSettings)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // 9단계: 접속한 선생님과 반응·인사 주고받기
+  const [reactOpen, setReactOpen] = useState(false)
+  const [greetCard, setGreetCard] = useState<{ from: string; name: string; key: number } | null>(null)
+  const greetTimer = useRef<number>(0)
+  const othersHinted = useRef(false)
   const [adminOpen, setAdminOpen] = useState(false)
   const effectsRef = useRef<TaskEffectsHandle | null>(null)
   const [floatSnack, setFloatSnack] = useState<{ snack: Snack; key: number } | null>(null)
@@ -258,6 +274,52 @@ export default function App() {
     }, 350)
   }, [showBubble, showNpcBubble])
 
+  // ---------- 9단계: 접속한 선생님과 인사·반응 ----------
+  /** 초록 점 선생님을 누르면: 가까이 걸어가서 그쪽을 보고 꾸벅 + 상대에게 알림 */
+  const handleRemote = useCallback(
+    (uid: string) => {
+      const r = remotePlayers.get(uid)
+      if (!r) return
+      const doGreet = () => {
+        const now = remotePlayers.get(uid)
+        bow(now ?? r)
+        audio.play('greet')
+        if (sendGreet(uid, 0)) showBubble(`🙏 ${(now ?? r).name} 선생님, 안녕하세요`, 2200)
+        else showBubble('방금 인사했어요', 1600)
+      }
+      const d = Math.hypot(player.position.x - r.x, player.position.z - r.z)
+      if (d < 2.4) return doGreet()
+      // 상대 앞 1.4m 지점까지 걸어감 (내 쪽 방향에서)
+      const k = 1.4 / Math.max(d, 0.001)
+      const front = { x: r.x + (player.position.x - r.x) * k, z: r.z + (player.position.z - r.z) * k }
+      walkTo(front, { x: r.x, z: r.z, radius: 2.4, onArrive: doGreet })
+    },
+    [showBubble],
+  )
+
+  const answerGreet = useCallback(() => {
+    if (!greetCard) return
+    const r = remotePlayers.get(greetCard.from)
+    bow(r ?? undefined)
+    audio.play('greet')
+    sendGreet(greetCard.from, 1)
+    showBubble(`🙏 ${greetCard.name} 선생님, 반가워요`, 2200)
+    window.clearTimeout(greetTimer.current)
+    setGreetCard(null)
+  }, [greetCard, showBubble])
+
+  const pickReaction = useCallback(
+    (id: number) => {
+      setReactOpen(false)
+      const text = reactionText(id)
+      if (!text) return
+      if (!sendReaction(id)) return showToast('조금 있다가 다시 보내 주세요', 1500)
+      audio.play('tap')
+      showBubble(text, REACTION_MS)
+    },
+    [showBubble, showToast],
+  )
+
   // ---------- 연구실 게시판 ----------
   const openBoard = useCallback((b: BoardId) => {
     const o = LAB_OBJECTS[b]
@@ -275,6 +337,27 @@ export default function App() {
   useEffect(() => {
     void setPresenceScene(sceneId)
   }, [sceneId])
+
+  // 나에게 온 인사: 인사면 맞인사 카드, 맞인사면 짧은 알림
+  useEffect(
+    () =>
+      onGreet((e) => {
+        audio.play('greet')
+        if (e.kind === 1) return showToast(`😊 ${e.name} 선생님이 맞인사했어요`, 2600)
+        window.clearTimeout(greetTimer.current)
+        setGreetCard({ from: e.from, name: e.name, key: Date.now() })
+        greetTimer.current = window.setTimeout(() => setGreetCard(null), 10000)
+      }),
+    [showToast],
+  )
+
+  // 처음으로 다른 선생님이 보이면 한 번만 안내
+  useEffect(() => {
+    if (presence.others.length > 0 && !othersHinted.current) {
+      othersHinted.current = true
+      showToast('🟢 다른 선생님이 함께 있어요. 눌러서 인사해 보세요', 3200)
+    }
+  }, [presence.others.length, showToast])
 
   // 소리 분위기: 장면·시간대에 맞춤 (1분마다 시간대 확인)
   useEffect(() => {
@@ -444,6 +527,7 @@ export default function App() {
   )
 
   const sceneProps = { name, bubble, labelLayer, onDoor: handleDoor }
+  const sheetOpen = !!dialog || !!boardOpen || mindOpen || !!cloud || !!heartOpen
 
   return (
     <div className="app">
@@ -490,7 +574,7 @@ export default function App() {
           {sceneId === 'office' && (
             <Office key="office" {...sceneProps} onNpc={handleNpc} npcBubbles={npcBubbles} npcBows={npcBows} />
           )}
-          <RemotePlayers key={`remote-${sceneId}`} labelLayer={labelLayer} />
+          <RemotePlayers key={`remote-${sceneId}`} labelLayer={labelLayer} onSelect={handleRemote} />
         </Suspense>
       </Canvas>
       <div ref={labelLayer} className="label-layer" />
@@ -503,7 +587,7 @@ export default function App() {
         player={playerUi}
         laps={lapUi.laps}
         titles={lapUi.titles}
-        hideBottom={!!dialog || !!boardOpen || mindOpen || !!cloud || !!heartOpen}
+        hideBottom={sheetOpen}
         counter={counter}
         onlineNow={presence.live ? presence.onlineCount : 0}
         remaining={taskUi.remaining}
@@ -511,6 +595,26 @@ export default function App() {
         offline={netStatus === 'offline'}
         soundOn={settings.bgm || settings.sfx}
       />
+
+      {presence.live && !sheetOpen && !reactOpen && (
+        <button className={`react-fab ${SCENES[sceneId].actions.length >= 4 ? 'high' : ''}`} aria-label="반응 보내기" onClick={() => setReactOpen(true)}>
+          😊
+        </button>
+      )}
+      {reactOpen && <ReactionPicker onPick={pickReaction} onClose={() => setReactOpen(false)} />}
+      {greetCard && (
+        <div key={greetCard.key} className="greet-card" role="status">
+          <span>
+            🙏 <strong>{greetCard.name}</strong> 선생님이 인사했어요
+          </span>
+          <button className="greet-answer" onClick={answerGreet}>
+            맞인사
+          </button>
+          <button className="dialog-x" aria-label="닫기" onClick={() => setGreetCard(null)}>
+            ✕
+          </button>
+        </div>
+      )}
 
       {dialog && (
         <DialogSheet

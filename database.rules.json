@@ -21,6 +21,11 @@
           "r": { ".validate": "newData.isNumber() && newData.val() >= -100 && newData.val() <= 100" },
           "p": { ".validate": "newData.isString() && newData.val().matches(/^(stand|walk|run|sit|bow)$/)" },
           "l": { ".validate": "newData.isNumber() && newData.val() >= -1 && newData.val() <= 1" },
+          "e": { ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= -1 && newData.val() < 200" },
+          "s": { ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() < 1000000" },
+          "g": { ".validate": "newData.isString() && newData.val().length <= 128 && newData.val().matches(/^[A-Za-z0-9_-]*$/)" },
+          "gs": { ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() < 1000000" },
+          "gk": { ".validate": "newData.isNumber() && (newData.val() === 0 || newData.val() === 1)" },
           "$other": { ".validate": false }
         }
       }

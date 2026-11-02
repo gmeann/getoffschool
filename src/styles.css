@@ -912,3 +912,73 @@ button.pill:active { transform: scale(0.94); }
 .nametag.real { background: rgba(43, 37, 64, 0.7); border-color: rgba(143, 224, 168, 0.55); font-weight: 600; }
 .real-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #6fdc8c; box-shadow: 0 0 0 2px rgba(111, 220, 140, 0.25); flex-shrink: 0; }
 .online-now { display: inline-flex; align-items: center; gap: 5px; margin-left: 6px; padding-left: 8px; border-left: 1px solid rgba(255, 255, 255, 0.25); }
+
+/* ---------- 9단계: 반응·인사 ---------- */
+.speech.react.emoji { font-size: 24px; padding: 4px 10px; line-height: 1.2; }
+.react-fab {
+  position: absolute;
+  z-index: 25;
+  right: calc(env(safe-area-inset-right) + var(--gutter));
+  bottom: calc(env(safe-area-inset-bottom) + var(--gutter) + 70px);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 236, 214, 0.35);
+  background: rgba(43, 37, 64, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(20, 12, 40, 0.25);
+  transition: transform 0.12s ease;
+}
+.react-fab:active { transform: scale(0.92); }
+.sheet-backdrop.light { background: rgba(20, 14, 32, 0.18); }
+.reaction-picker {
+  position: absolute;
+  right: calc(env(safe-area-inset-right) + var(--gutter));
+  bottom: calc(env(safe-area-inset-bottom) + var(--gutter) + 70px);
+  width: min(340px, calc(100vw - 2 * var(--gutter)));
+  padding: 14px;
+  border-radius: 20px;
+  background: rgba(255, 249, 242, 0.97);
+  color: #3a2f52;
+  box-shadow: 0 12px 36px rgba(20, 12, 40, 0.3);
+  animation: pop 0.18s ease-out;
+}
+.reaction-head { display: flex; align-items: center; font-size: 15px; margin-bottom: 10px; }
+.reaction-emojis { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-bottom: 10px; }
+.reaction-emoji { aspect-ratio: 1; border: 0; border-radius: 12px; background: rgba(58, 47, 82, 0.06); font-size: 22px; cursor: pointer; padding: 0; }
+.reaction-emoji:active, .reaction-cheer:active { transform: scale(0.94); }
+.reaction-cheers { display: flex; flex-wrap: wrap; gap: 6px; }
+.reaction-cheer { border: 1px solid rgba(58, 47, 82, 0.12); border-radius: 999px; background: #fff; color: #3a2f52; font: inherit; font-size: 13px; font-weight: 600; padding: 7px 11px; cursor: pointer; }
+.reaction-hint { display: flex; align-items: center; gap: 6px; margin: 12px 0 0; font-size: 12px; opacity: 0.7; }
+.greet-card {
+  position: absolute;
+  z-index: 34;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(env(safe-area-inset-top) + var(--gutter) + 56px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 2 * var(--gutter));
+  padding: 8px 8px 8px 16px;
+  border-radius: 999px;
+  background: rgba(255, 249, 242, 0.96);
+  color: #3a2f52;
+  font-size: 14px;
+  box-shadow: 0 8px 24px rgba(20, 12, 40, 0.25);
+  animation: pop 0.2s ease-out;
+}
+.greet-card > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.greet-card .dialog-x { margin-left: 0; flex-shrink: 0; }
+.greet-answer { flex-shrink: 0; border: 0; border-radius: 999px; background: #f2a65a; color: #fff; font: inherit; font-weight: 700; padding: 8px 14px; cursor: pointer; }
+@media (max-width: 480px) {
+  .react-fab { width: 44px; height: 44px; font-size: 22px; bottom: calc(env(safe-area-inset-bottom) + var(--gutter) + 64px); }
+  .reaction-picker { bottom: calc(env(safe-area-inset-bottom) + var(--gutter) + 64px); }
+  /* 아래 버튼이 4개 이상이면 두 줄로 내려갈 수 있어 더 위로 */
+  .react-fab.high { bottom: calc(env(safe-area-inset-bottom) + var(--gutter) + 112px); }
+  /* 폰에서는 상단 오른쪽 칸들 아래로 */
+  .greet-card { top: auto; bottom: calc(env(safe-area-inset-bottom) + 130px); font-size: 13px; }
+}
