@@ -57,13 +57,17 @@ class AudioEngine {
 
   constructor() {
     if (typeof window === 'undefined') return
-    // 첫 터치/클릭 때 소리 장치를 깨움
+    // 첫 터치/클릭 때 소리 장치를 깨움.
+    // 폰 브라우저는 손가락을 '뗄 때'(touchend/pointerup/click)만 사용자 동작으로 인정하므로 그 순간에 깨움.
+    // 소리가 실제로 나기 시작할 때까지 매번 다시 시도함 (iOS 는 첫 시도가 실패하는 경우가 있음).
     const unlock = () => {
       this.unlocked = true
+      if (this.wantsSound()) this.wake()
       this.apply()
     }
-    window.addEventListener('pointerdown', unlock, { capture: true })
-    window.addEventListener('keydown', unlock, { capture: true })
+    for (const ev of ['touchend', 'pointerup', 'click', 'keydown']) {
+      window.addEventListener(ev, unlock, { capture: true, passive: true })
+    }
     document.addEventListener('visibilitychange', () => {
       if (!this.ctx) return
       if (document.visibilityState === 'hidden') void this.ctx.suspend()
@@ -147,6 +151,30 @@ class AudioEngine {
     return ctx
   }
 
+  /**
+   * 사용자 동작 안에서 바로 소리 장치를 깨움 (모바일 대응)
+   * - iOS: 무음 버퍼를 한 번 재생해야 소리 경로가 열림
+   * - iOS 17+: audioSession 을 'playback' 으로 두면 무음 스위치가 켜져 있어도 소리가 남
+   */
+  private wake() {
+    const ctx = this.init()
+    try {
+      const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession
+      if (session && session.type !== 'playback') session.type = 'playback'
+    } catch {
+      /* 지원하지 않는 브라우저 */
+    }
+    if (ctx.state !== 'running') void ctx.resume()
+    try {
+      const src = ctx.createBufferSource()
+      src.buffer = ctx.createBuffer(1, 1, 22050)
+      src.connect(ctx.destination)
+      src.start(0)
+    } catch {
+      /* 무시 */
+    }
+  }
+
   /** 설정에 맞춰 켜고 끄기 */
   private apply() {
     const s = getSettings()
@@ -160,7 +188,8 @@ class AudioEngine {
       return
     }
     const ctx = this.init()
-    if (ctx.state !== 'running' && document.visibilityState !== 'hidden') void ctx.resume()
+    // 'suspended' 나 iOS 의 'interrupted'(전화·알림 뒤) 상태면 다시 깨움 (소리 버튼을 누른 순간이면 그 동작 안에서)
+    if ((ctx.state as string) !== 'running' && document.visibilityState !== 'hidden') this.wake()
     this.ramp(this.bgmBus.gain, s.bgm ? 0.22 * s.bgmVolume : 0, 1.6)
     this.ramp(this.sfxBus.gain, s.sfx ? 0.5 * s.sfxVolume : 0, 0.2)
     if (s.bgm) this.startScheduler()
